@@ -7,7 +7,7 @@ Exit status: 0 = no findings, 1 = findings, 2 = the scanner did not do its job.
 A scanner that crashed, or quietly scanned nothing, must never look like a
 scanner that found nothing. So before trusting "no findings" we check that it
 really looked: gitleaks must have scanned the pull request's commits, and
-Semgrep must have scanned every Python file outside tests/.
+Semgrep must have scanned every Python file it doesn't skip by default.
 """
 
 import argparse
@@ -39,6 +39,10 @@ PLAIN_ENGLISH = {
 }
 
 
+# Folders Semgrep 1.178.0 skips by default (measured, not from its docs).
+SEMGREP_SKIPS = {"tests", "test", "build", "dist", "vendor", "node_modules", ".venv", ".tox"}
+
+
 class ScannerDidNotRun(Exception):
     """The scanner's result cannot be trusted as a pass."""
 
@@ -62,10 +66,13 @@ def gitleaks_findings(report, args):
 
 
 def semgrep_findings(report, _args):
-    tracked = subprocess.run(
-        ["git", "ls-files", "--", "*.py", ":!:tests/*"],
-        capture_output=True, text=True, check=True,
-    ).stdout.split()
+    tracked = [
+        path
+        for path in subprocess.run(
+            ["git", "ls-files", "--", "*.py"], capture_output=True, text=True, check=True
+        ).stdout.splitlines()
+        if not SEMGREP_SKIPS.intersection(path.split("/")[:-1])
+    ]
     missed = sorted(set(tracked) - set(report["paths"]["scanned"]))
     if not tracked or missed:
         raise ScannerDidNotRun(f"Semgrep did not scan these files: {missed or 'any'}")

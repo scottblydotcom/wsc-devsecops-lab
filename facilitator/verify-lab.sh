@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# "check && pass || fail" is safe here: pass() cannot fail.
+# shellcheck disable=SC2015
 # Self-check for the lab. Run it from the repository before publishing, and
 # again the day before the workshop:
 #
@@ -16,7 +18,7 @@
 set -uo pipefail
 
 repo="$(git rev-parse --show-toplevel)"
-cd "$repo"
+cd "$repo" || exit 1
 # Keep scratch files inside the repo: Docker on macOS (Colima) only sees $HOME.
 work="$repo/.git/lab-verify"
 rm -rf "$work" && mkdir -p "$work"
@@ -57,7 +59,8 @@ gate() {
   rm -f "$work/gl.json" "$work/gl.log" "$work/sg.json" "$work/sg.log"
   (
     cd "$dir" || exit 2
-    export GITHUB_STEP_SUMMARY="$work/summary-$tool-$(basename "$dir").md"
+    GITHUB_STEP_SUMMARY="$work/summary-$tool-$(basename "$dir").md"
+    export GITHUB_STEP_SUMMARY
     if [ "$tool" = gitleaks ]; then
       expected="$(git rev-list --count "$range" 2>/dev/null || echo 1)"
       gitleaks git . --config .gitleaks.toml --redact --no-banner --log-opts="$range" \

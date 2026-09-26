@@ -5,6 +5,7 @@
 # applies a recorded example of an agent's change for the request in LAB.md.
 # It puts the change on a new branch and pushes it, ready for a pull request.
 set -euo pipefail
+# shellcheck source=scripts/lib.sh
 source "$(dirname "$0")/lib.sh"
 cd "$(git rev-parse --show-toplevel)"
 

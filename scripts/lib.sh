@@ -1,3 +1,4 @@
+# shellcheck shell=bash disable=SC2034
 # Shared helpers for the lab scripts. Not meant to be run on its own.
 
 # Where the pre-recorded agent change lives: the public template repository.

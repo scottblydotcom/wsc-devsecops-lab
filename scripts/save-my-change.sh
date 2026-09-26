@@ -4,6 +4,7 @@
 #   LAB STEP 3: after you turn on the security gates.
 # Changes never go straight to main; they go on a branch, for a pull request.
 set -euo pipefail
+# shellcheck source=scripts/lib.sh
 source "$(dirname "$0")/lib.sh"
 cd "$(git rev-parse --show-toplevel)"
 

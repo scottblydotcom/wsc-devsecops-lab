@@ -2,6 +2,7 @@
 # LAB STEP 3, backup plan: turns on the security gates for you and saves the
 # change. Use it if editing the workflow file by hand gave you trouble.
 set -euo pipefail
+# shellcheck source=scripts/lib.sh
 source "$(dirname "$0")/lib.sh"
 cd "$(git rev-parse --show-toplevel)"
 
