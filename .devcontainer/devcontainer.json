@@ -1,0 +1,29 @@
+// Opens this repository ready to run in GitHub Codespaces.
+// The container image is pinned by digest, like the actions in our workflows.
+{
+  "name": "WSC DevSecOps lab",
+  "image": "mcr.microsoft.com/devcontainers/python:3.2-3.12-trixie@sha256:a00123df1ec4af04b4013fda8c27438b73b1817a24f6bcd3d61e2f6aa0800302",
+  "postCreateCommand": "pip install --disable-pip-version-check -r requirements-dev.txt && echo 'Lab ready. Start the app with: python app.py'",
+  // pip installs as the "vscode" user into ~/.local. Put that first on PATH so
+  // "pytest" and "ruff" are the versions pinned in requirements-dev.txt.
+  "remoteEnv": {
+    "PATH": "/home/vscode/.local/bin:${containerEnv:PATH}"
+  },
+  "forwardPorts": [5000],
+  "portsAttributes": {
+    "5000": {
+      "label": "Team Directory API",
+      "onAutoForward": "notify"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-python.python"],
+      "settings": {
+        "files.autoSave": "afterDelay",
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.testing.pytestEnabled": true
+      }
+    }
+  }
+}

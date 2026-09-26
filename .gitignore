@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+directory.db
+# security-gate reports, if you run the scanners yourself
+gitleaks.json
+semgrep.json
+.env

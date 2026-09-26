@@ -1,0 +1,12 @@
+[project]
+name = "wsc-devsecops-lab"
+version = "1.0.0"
+description = "Team Directory API: intentionally small training app for the WSC DevSecOps lab"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py312"
