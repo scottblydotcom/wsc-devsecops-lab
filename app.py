@@ -39,7 +39,7 @@ def index():
     return jsonify(
         app="Team Directory API (WSC DevSecOps lab)",
         logged_in_as=session.get("username"),
-        try_these=["/login/alice", "/api/me"],
+        try_these=["/login/alice", "/api/me", "/api/users/1/profile"],
     )
 
 
@@ -58,6 +58,18 @@ def login(username):
 @login_required
 def me():
     return jsonify(user_id=session["user_id"], username=session["username"])
+
+
+@app.get("/api/users/<int:user_id>/profile")
+@login_required
+def user_profile(user_id):
+    """Return a user's profile by ID. People may only see their own profile."""
+    if user_id != session["user_id"]:
+        abort(403)
+    profile = db.get_profile(user_id)
+    if profile is None:
+        abort(404)
+    return jsonify(profile)
 
 
 if __name__ == "__main__":
