@@ -164,6 +164,21 @@ expect "gitleaks that scanned 0 commits is reported as not finished" "2 -" \
   "$(gate gitleaks "$dir" "0000000000000000000000000000000000000000..HEAD")"
 expect "gitleaks that scanned only some commits is reported as not finished" "2 wsclab-session-key" \
   "$(gate gitleaks "$dir" "HEAD~1..HEAD")"
+# The exact-count guard must agree with gitleaks on unusual but normal commits,
+# or it would cry "did not finish" on a healthy scan.
+git clone -q "$work/main" "$work/oddcommits" && (
+  cd "$work/oddcommits" && git config user.email t@example.com && git config user.name t &&
+    sed -i.bak '/^import os$/d' app.py && rm -f app.py.bak && git commit -qam "delete a line only" &&
+    git rm -q LICENSE && git commit -qm "delete a whole file" &&
+    git mv AGENTS.md AGENTS-renamed.md && git commit -qm "rename only" &&
+    chmod +x db.py && git commit -qam "mode change only" &&
+    printf '\000\001' >blob.bin && git add blob.bin && git commit -qm "binary only" &&
+    git commit -q --allow-empty -m "empty" &&
+    git switch -qc side HEAD~2 && printf 'x = 1\n' >side.py && git add side.py && git commit -qm side &&
+    git switch -q - && git merge -q --no-edit side
+)
+expect "gitleaks guard agrees with gitleaks on deletions, renames, binaries, merges" "0 -" \
+  "$(gate gitleaks "$work/oddcommits")"
 echo '{"results": [], "errors": [], "paths": {"scanned": []}}' >"$work/empty.json"
 (cd "$dir" && "$py" .github/scripts/report_findings.py semgrep "$work/empty.json" 0 >/dev/null 2>&1)
 expect "semgrep that scanned no files is reported as not finished" 2 $?
@@ -242,7 +257,29 @@ grep -q "already on" "$work/script.log" && pass "turn-on-gates.sh says the gates
 run_script optionb-fresh save-my-change.sh
 expect "save-my-change.sh with nothing new stops" 1 $?
 
+# Same, but the attendee clicked Commit on main in VS Code before running it.
+# (Reset the remote branch to the agent change alone, gates off.)
+git -C "$work/optionb" push -q origin --delete agent-change
+run_script optionb use-example-change.sh
+clone_copy optionb optionb-committed
+edit_gate_line optionb-committed
+(cd "$work/optionb-committed" && git commit -qam "enable gates (committed on main)")
+run_script optionb-committed save-my-change.sh
+expect "Step 3, edit committed on main: lands on agent-change" "0 agent-change on" \
+  "$? $(git -C "$work/optionb-committed" branch --show-current) $(gates_on optionb-committed origin/agent-change)"
+expect "Step 3, edit committed on main: no stray my-agent-change branch" no \
+  "$(remote_has optionb-committed my-agent-change)"
+expect "Step 3, edit committed on main: agent code still on the branch" 1 \
+  "$(git -C "$work/optionb-committed" show origin/agent-change:app.py | grep -c wsclab_sk_)"
+
 section "Attendees going off script"
+# A run that stopped after making the branch but before saving the example.
+make_copy interrupted
+(cd "$work/interrupted" && git switch -q --no-track -c agent-change origin/main && git push -q -u origin agent-change)
+run_script interrupted use-example-change.sh
+expect "Interrupted earlier run: re-running fills the empty branch" "0 app.py db.py tests/test_profile.py" \
+  "$? $(git -C "$work/interrupted" diff --name-only origin/main origin/agent-change | tr '\n' ' ' | sed 's/ $//')"
+
 # Pushes that fail (Wi-Fi, a GitHub error) must be retried by re-running, never
 # reported as done.
 make_copy flaky

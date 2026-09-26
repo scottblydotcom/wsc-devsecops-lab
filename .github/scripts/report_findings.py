@@ -55,15 +55,20 @@ def git(*args):
 
 
 def commits_gitleaks_should_scan(log_opts):
-    """gitleaks reads `git log -p`, which shows a diff only for non-merge
-    commits that add at least one line of text. Count exactly those."""
-    count, adds = 0, False
-    for line in git("log", "--no-merges", "--format=@%H", "--numstat", log_opts).splitlines():
+    """Count the commits gitleaks 8.30.1 reports as scanned: non-merge commits
+    that change at least one line of text in a file they don't delete outright
+    (measured: whole-file deletions, pure renames, mode changes and binary
+    files don't count; a commit that only deletes lines inside a file does)."""
+    count, changed = 0, False
+    log = git("log", "--no-merges", "--diff-filter=d", "--format=@%H", "--numstat", log_opts)
+    for line in log.splitlines():
         if line.startswith("@"):
-            count, adds = count + adds, False
-        elif re.match(r"[1-9]\d*\t", line):
-            adds = True
-    return count + adds
+            count, changed = count + changed, False
+        else:
+            numbers = re.match(r"(\d+)\t(\d+)\t", line)
+            if numbers and int(numbers[1]) + int(numbers[2]) > 0:
+                changed = True
+    return count + changed
 
 
 def gitleaks_findings(report, args):

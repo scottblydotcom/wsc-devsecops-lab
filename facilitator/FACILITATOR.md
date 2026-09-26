@@ -40,7 +40,7 @@ Two more branches for the projector:
 
 | Branch | State | Use it for |
 |---|---|---|
-| `agent-output-after-gates` | The same feature with the three gate findings fixed. Tests ✅, gates ✅, IDOR still there | Step 4: "Everything is green. Ship it?" |
+| `agent-output-after-gates` | The same feature written without the three gate findings in the first place. Tests ✅, gates ✅, IDOR still there | Step 4: "Everything is green. Ship it?" |
 | `reference-solution` | The authorization fix plus the test the agent didn't write | Debrief, and LAB's take-home |
 
 The reference fix is three lines: the ownership check (`abort(403)` unless it's
@@ -56,7 +56,7 @@ behavior in. The missing test is four lines.
 | 0–8 | **1. Copy, Codespace, run** | Mirror LAB.md on the projector. While codespaces build (~2 min): "This is a full Linux machine in your browser. Nothing is installed on your laptop." Pairs are fine. |
 | 8–18 | **2. Agent writes the feature, PR, green** | Read the request aloud. Most people run Option B. If possible, have one volunteer with Copilot do Option A live on the projector. When checks go green: **"Lint passed. Tests passed, including the agent's own tests. Would you merge it?"** Show of hands only: nobody clicks Merge. |
 | 18–30 | **3. Turn on the gates, red** | Switch the projector to **your own Option B demo pull request** (Option A gates may well stay green). Do the one-line edit there first, then let the room do it. While the gates run (~1–2 min), walk the callouts below. Then walk the Summary table: secret, debug, SQL injection. Each red mark sits on a line the agent wrote. |
-| 30–38 | **4. What the gates missed** | Show the green `agent-output-after-gates` runs (recipe below): "Suppose the agent fixed all three. Everything is green. Ship it?" Then do the IDOR live: log in as Alice, open profile 1, change it to 2. **"Which check caught this? None of them. Who *should* have?"** Bring the Option A volunteer back for "whose agent did better?" |
+| 30–38 | **4. What the gates missed** | Show the green `agent-output-after-gates` runs (recipe below): "Suppose the agent had avoided all three from the start. Everything is green. Ship it?" (If it had fixed them in a new commit instead, the secret scan would stay red: the key is still in history.) Then do the IDOR live: log in as Alice, open profile 1, change it to 2. **"Which check caught this? None of them. Who *should* have?"** Bring the Option A volunteer back for "whose agent did better?" |
 | 38–45 | **Debrief + buffer** | See the debrief section. Remind people to delete their codespace (LAB step 5). |
 
 If you're running behind, cut Option A demos first, then compress step 3's

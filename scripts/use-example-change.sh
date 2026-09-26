@@ -19,8 +19,14 @@ db.py:62d3df4a1452cb3adb03eeb0f37fa84adb8b5449
 tests/test_profile.py:387014e4b3ea7d2437bf0cc35e461963365fe1fe"
 
 git fetch --quiet origin
+ref=""
+if git show-ref --verify --quiet "refs/heads/$branch"; then
+  ref="refs/heads/$branch"
+elif git show-ref --verify --quiet "refs/remotes/origin/$branch"; then
+  ref="refs/remotes/origin/$branch"
+fi
 # Already done (maybe in an earlier codespace)? Go back to that branch.
-if branch_exists "$branch"; then
+if [ -n "$ref" ] && [ -n "$(git rev-list "origin/main..$ref")" ]; then
   if [ "$(git branch --show-current)" != "$branch" ]; then
     [ -z "$(git status --porcelain)" ] || git stash push --quiet --include-untracked -m "set aside by use-example-change.sh"
     git switch --quiet "$branch" ||
@@ -36,6 +42,11 @@ fi
 if [ -n "$(git status --porcelain)" ]; then
   git stash push --quiet --include-untracked -m "my agent attempt (set aside by use-example-change.sh)"
   say "Your agent's unsaved changes were set aside, not deleted. (A facilitator can bring them back with: git stash pop)"
+fi
+# An earlier run stopped before saving anything: start that branch again.
+if [ -n "$ref" ]; then
+  git switch --quiet --detach origin/main
+  git branch --quiet -D "$branch" 2>/dev/null || true
 fi
 
 say "Downloading the example agent change..."
