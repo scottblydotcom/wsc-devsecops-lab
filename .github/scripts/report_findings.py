@@ -40,7 +40,7 @@ PLAIN_ENGLISH = {
 }
 
 # Folders Semgrep 1.178.0 skips by default (measured, not from its docs).
-SEMGREP_SKIPS = {"tests", "test", "build", "_build", "dist", "vendor", "node_modules", ".venv", ".tox"}
+SEMGREP_SKIPS = {"tests", "test", "build", "_build", "dist", "vendor", "node_modules", ".venv", ".env", ".tox"}
 
 
 class ScannerDidNotRun(Exception):

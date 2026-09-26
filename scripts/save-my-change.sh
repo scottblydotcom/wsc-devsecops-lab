@@ -18,8 +18,7 @@ if [ "$branch" = "main" ] || [ -z "$branch" ]; then
   touched="$(git diff --name-only origin/main --)"
   if grep -q 'security-gates.yml' <<<"$changes$touched"; then
     # Step 3 in a fresh codespace: the gates belong on your step 2 branch.
-    pr_branch="$(existing_pr_branch)" ||
-      die "You have more than one lab branch. Raise your hand."
+    pr_branch="$(existing_pr_branch)"
     [ -n "$pr_branch" ] ||
       die "Do LAB step 2 first, so you have a pull request for the gates to check."
     # Anything committed on main by mistake becomes unsaved edits again, so it

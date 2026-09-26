@@ -14,8 +14,7 @@ my_repo() {
   if [ -n "${GITHUB_REPOSITORY:-}" ]; then
     echo "$GITHUB_REPOSITORY"
   else
-    git remote get-url origin |
-      sed -E 's#^(https://github\.com/|ssh://git@github\.com/|git@github\.com:)##; s#\.git$##'
+    git remote get-url origin | sed -E 's#^.*github\.com[^:/]*[:/]##; s#\.git$##'
   fi
 }
 
@@ -24,16 +23,15 @@ branch_exists() {  # locally, or on GitHub
     git show-ref --verify --quiet "refs/remotes/origin/$1"
 }
 
-# The lab branch you already made in step 2, if there is exactly one.
+# The lab branch you made in step 2. If you made both (switched from Option A
+# to B), the one you worked on most recently.
 existing_pr_branch() {
-  local found="" b
+  local b ref
   for b in $PR_BRANCHES; do
-    if branch_exists "$b"; then
-      [ -z "$found" ] || return 1   # more than one: let a human decide
-      found="$b"
-    fi
-  done
-  [ -n "$found" ] && echo "$found"
+    for ref in "refs/heads/$b" "refs/remotes/origin/$b"; do
+      if git show-ref --verify --quiet "$ref"; then git log -1 --format="%ct $b" "$ref"; fi
+    done
+  done | sort -rn | head -1 | cut -d' ' -f2
 }
 
 # Push the current branch if GitHub doesn't have all of it yet.

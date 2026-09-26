@@ -139,7 +139,7 @@ Open `.github/workflows/security-gates.yml` on the projector:
 | A workflow run is **waiting for approval** | Since July 2026 GitHub may hold runs it judges suspicious, even in your own repo. Attendee clicks the run → **Approve and run workflow**. |
 | Push rejected when turning on gates (workflow-file permission) | Use the github.com edit in LAB's troubleshooting table: branch menu → their PR branch → `.github/workflows/security-gates.yml` → pencil → delete the `# ` before `pull_request:` → **Commit changes** to that branch. |
 | No Security gates checks, or a workflow-error banner | `bash scripts/turn-on-gates.sh`. It restores the file, makes the edit correctly, and pushes. |
-| Option A agent stalled or made a mess | `bash scripts/use-example-change.sh`. It sets the agent's unsaved work aside (`git stash list` / `git stash pop` to get it back) and continues with Option B. |
+| Option A agent stalled or made a mess | `bash scripts/use-example-change.sh`. It sets the agent's unsaved work aside and continues with Option B. To get the work back later: `git switch main`, then `git stash pop`. |
 | Option A **Build and test** is red | Their agent's code. Ask the agent to fix it, or switch to Option B. |
 | A script says a push was refused | Run the same command again: the scripts push anything that didn't make it. |
 | `use-example-change.sh` can't download the example | Wi-Fi. It needs to reach github.com. Hotspot, or pair up. |

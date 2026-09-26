@@ -346,6 +346,27 @@ expect "Switching from Option A to B: succeeds" "0 yes" "$? $(remote_has switche
 expect "Switching from Option A to B: the agent's work was set aside, not lost" 1 \
   "$(git -C "$work/switched" stash list | wc -l | tr -d ' ')"
 
+# Option A first, then switched to Option B: two lab branches. Step 3 from a
+# fresh codespace must pick the one worked on last, not stop.
+make_copy both
+echo "# my agent's attempt" >>"$work/both/app.py"
+run_script both save-my-change.sh
+sleep 1   # commit times have one-second resolution
+run_script both use-example-change.sh
+clone_copy both both-fresh
+edit_gate_line both-fresh
+run_script both-fresh save-my-change.sh
+expect "Both options used: step 3 lands on the latest branch (agent-change)" "0 agent-change" \
+  "$? $(git -C "$work/both-fresh" branch --show-current)"
+
+# Step 3 before step 2: a clear stop, not a silent exit.
+make_copy early
+edit_gate_line early
+run_script early save-my-change.sh
+expect "Step 3 before step 2: stops" 1 $?
+grep -q "Do LAB step 2 first" "$work/script.log" && pass "Step 3 before step 2: says to do step 2 first" ||
+  fail "Step 3 before step 2: says to do step 2 first"
+
 # An agent created a folder of tools (like a virtualenv) that isn't ignored.
 make_copy bulky
 mkdir -p "$work/bulky/tools" && for i in $(seq 1 60); do echo "x$i" >"$work/bulky/tools/f$i.py"; done

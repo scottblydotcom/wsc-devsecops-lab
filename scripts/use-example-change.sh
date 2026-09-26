@@ -28,7 +28,10 @@ fi
 # Already done (maybe in an earlier codespace)? Go back to that branch.
 if [ -n "$ref" ] && [ -n "$(git rev-list "origin/main..$ref")" ]; then
   if [ "$(git branch --show-current)" != "$branch" ]; then
-    [ -z "$(git status --porcelain)" ] || git stash push --quiet --include-untracked -m "set aside by use-example-change.sh"
+    if [ -n "$(git status --porcelain)" ]; then
+      git stash push --quiet --include-untracked -m "set aside by use-example-change.sh"
+      say "Your unsaved changes were set aside, not deleted. (To get them back: git switch main, then git stash pop)"
+    fi
     git switch --quiet "$branch" ||
       die "You already did this step, but could not switch to '$branch'. Raise your hand."
   fi
@@ -41,7 +44,7 @@ fi
 # Switching from your own agent (Option A)? Set its unsaved work aside.
 if [ -n "$(git status --porcelain)" ]; then
   git stash push --quiet --include-untracked -m "my agent attempt (set aside by use-example-change.sh)"
-  say "Your agent's unsaved changes were set aside, not deleted. (A facilitator can bring them back with: git stash pop)"
+  say "Your agent's unsaved changes were set aside, not deleted. (To get them back: git switch main, then git stash pop)"
 fi
 # An earlier run stopped before saving anything: start that branch again.
 if [ -n "$ref" ]; then
@@ -50,7 +53,8 @@ if [ -n "$ref" ]; then
 fi
 
 say "Downloading the example agent change..."
-if git fetch --quiet "$TEMPLATE_REPO" "$example_branch" 2>/dev/null ||
+# GIT_TERMINAL_PROMPT=0: fail fast instead of waiting for a password prompt.
+if GIT_TERMINAL_PROMPT=0 git fetch --quiet "$TEMPLATE_REPO" "$example_branch" 2>/dev/null ||
    git fetch --quiet origin "$example_branch" 2>/dev/null; then
   example="$(git rev-parse FETCH_HEAD)"
 else

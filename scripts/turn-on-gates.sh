@@ -10,7 +10,7 @@ git fetch --quiet origin
 
 workflow=".github/workflows/security-gates.yml"
 if [ "$(git branch --show-current)" = "main" ]; then
-  pr_branch="$(existing_pr_branch)" || die "You have more than one lab branch. Raise your hand."
+  pr_branch="$(existing_pr_branch)"
   [ -n "$pr_branch" ] || die "Do LAB step 2 first, so you have a pull request for the gates to check."
   git checkout --quiet -- "$workflow"   # drop any half-done edit on main
   git switch --quiet "$pr_branch" || die "Could not switch to your '$pr_branch' branch. Raise your hand."
