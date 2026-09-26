@@ -11,14 +11,22 @@ cd "$(git rev-parse --show-toplevel)"
 branch="agent-change"
 example_branch="agent-output-example"
 
+git fetch --quiet origin
+# Already done (maybe in an earlier codespace)? Go back to that branch.
+if git show-ref --verify --quiet "refs/heads/$branch" ||
+   git show-ref --verify --quiet "refs/remotes/origin/$branch"; then
+  if [ "$(git branch --show-current)" != "$branch" ]; then
+    git switch --quiet "$branch" ||
+      die "You already did this step, but could not switch to '$branch'. Ask a facilitator for help."
+  fi
+  say "You already did this step. You're on your '$branch' branch."
+  print_pr_link "$branch"
+  exit 0
+fi
 [ -z "$(git status --porcelain)" ] ||
   die "Some files have changes that are not saved to git yet. Ask a facilitator for help."
-if git show-ref --verify --quiet "refs/heads/$branch"; then
-  die "You already have the '$branch' branch, so this step is done. Open your pull request: https://github.com/$(my_repo)/compare/main...$branch?expand=1"
-fi
 
 say "Downloading the example agent change..."
-git fetch --quiet origin main
 if git fetch --quiet "$TEMPLATE_REPO" "$example_branch" 2>/dev/null ||
    git fetch --quiet origin "$example_branch" 2>/dev/null; then
   example="$(git rev-parse FETCH_HEAD)"

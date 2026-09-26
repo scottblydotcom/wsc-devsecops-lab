@@ -158,7 +158,7 @@ section "Attendee helper scripts, in a template-style copy (no shared history)"
 # this repository. Build one, then play the attendee in a clone of it.
 make_copy() {
   local name="$1"
-  git init -q --bare "$work/$name.git"
+  git init -q --bare --initial-branch=main "$work/$name.git"
   git clone -q "$repo" "$work/$name-seed" && (
     cd "$work/$name-seed" &&
       git checkout -q --orphan fresh main && git commit -q -m "Initial commit" &&
@@ -187,7 +187,16 @@ expect "Option B: files match the example branch" "" \
 grep -q "compare/main...agent-change" "$work/script.log" && pass "Option B: prints the pull request link" ||
   fail "Option B: prints the pull request link"
 run_script optionb use-example-change.sh
-expect "Option B: running it twice stops politely" 1 $?
+expect "Option B: running it again just returns to the branch" 0 $?
+grep -q "already did this step" "$work/script.log" && pass "Option B: says the step is already done" ||
+  fail "Option B: says the step is already done"
+
+# A fresh codespace starts on main without the local branch: re-running must
+# recover it rather than fail on push.
+git -C "$work/optionb" switch -q main && git -C "$work/optionb" branch -q -D agent-change
+run_script optionb use-example-change.sh
+expect "Option B: in a fresh codespace, re-running recovers the branch" \
+  "0 agent-change" "$? $(git -C "$work/optionb" branch --show-current)"
 
 sed -i.bak 's/^  # pull_request:/  pull_request:/' "$work/optionb/$workflow" && rm -f "$work/optionb/$workflow.bak"
 run_script optionb save-my-change.sh

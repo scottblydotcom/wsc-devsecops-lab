@@ -126,4 +126,5 @@ Look in `app.py` for the route it added.)
 | The pop-up for port 5000 never appeared | **Ports** tab next to the terminal → globe icon on port 5000 |
 | `Address already in use` | The app is already running in another terminal. Use that one, or close it. |
 | The codespace stopped | It stops after 30 idle minutes. Click **Restart codespace**. |
+| You're in a brand-new codespace, after step 2 | Get back to your branch. Option B: run `bash scripts/use-example-change.sh` again. Option A: run `git switch my-agent-change` |
 | Anything else | Raise your hand, or pair up with a neighbor |

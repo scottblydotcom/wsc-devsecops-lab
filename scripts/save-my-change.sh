@@ -13,8 +13,11 @@ cd "$(git rev-parse --show-toplevel)"
 branch="$(git branch --show-current)"
 if [ "$branch" = "main" ] || [ -z "$branch" ]; then
   branch="my-agent-change"
-  git show-ref --verify --quiet "refs/heads/$branch" &&
+  git fetch --quiet origin
+  if git show-ref --verify --quiet "refs/heads/$branch" ||
+     git show-ref --verify --quiet "refs/remotes/origin/$branch"; then
     die "You already have a '$branch' branch. Ask a facilitator for help."
+  fi
   git switch --quiet --create "$branch"
 fi
 

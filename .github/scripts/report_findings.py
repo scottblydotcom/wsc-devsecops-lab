@@ -131,21 +131,28 @@ def main():
         )
         return 0
 
+    # Two rules can flag the same problem on the same line; show it once.
+    problems = {}
+    for f in findings:
+        meaning = PLAIN_ENGLISH.get(f["rule"], f["message"])
+        problems.setdefault((f["file"], f["line"], meaning), []).append(f["rule"])
+
     rows = [
-        f"## ❌ {title}: {len(findings)} finding(s)",
+        f"## ❌ {title}: {len(problems)} problem(s) found",
         "",
         "| Where | Rule | What it means |",
         "|---|---|---|",
     ]
-    for f in findings:
-        meaning = PLAIN_ENGLISH.get(f["rule"], f["message"])
+    for (file, line, meaning), rules in problems.items():
+        rule_names = ", ".join(rules)
         props = ",".join([
-            f"file={escape_property(f['file'])}",
-            f"line={f['line']}",
-            f"title={escape_property(title + ': ' + f['rule'])}",
+            f"file={escape_property(file)}",
+            f"line={line}",
+            f"title={escape_property(title + ': ' + rule_names)}",
         ])
         print(f"::error {props}::{escape_data(meaning)}")
-        rows.append(f"| `{f['file']}` line {f['line']} | `{f['rule']}` | {meaning.replace('|', '/')} |")
+        rule_cell = ", ".join(f"`{rule}`" for rule in rules)
+        rows.append(f"| `{file}` line {line} | {rule_cell} | {meaning.replace('|', '/')} |")
     write_summary("\n".join(rows))
     return 1
 
