@@ -1,0 +1,85 @@
+# Stage 2 of the pipeline: security gates.
+#   - Secret scan (gitleaks): passwords, keys and tokens committed to git.
+#   - Code scan (Semgrep): risky code patterns such as SQL injection.
+# Both are free and open source, and neither needs an account or a token.
+#
+# These gates are OFF when the lab starts: nothing below runs on pull requests.
+# LAB STEP 3 turns them on. See LAB.md.
+name: Security gates
+
+on:
+  workflow_dispatch: # the manual "Run workflow" button on the Actions tab
+  # pull_request: # LAB STEP 3: put your cursor on this line and press Ctrl+/ (Cmd+/ on a Mac)
+
+# Least privilege: the pipeline's token can read the code and nothing else.
+# Findings are reported with annotations and a job summary, which need no
+# extra permissions.
+permissions:
+  contents: read
+
+concurrency:
+  group: security-gates-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  secrets:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      GITLEAKS_VERSION: "8.30.1"
+      GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # full history: a secret deleted in a later commit is still leaked
+          persist-credentials: false
+
+      - name: Install gitleaks (pinned version, checksum verified)
+        run: |
+          cd "$RUNNER_TEMP"
+          curl -sSfL -o gitleaks.tar.gz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  gitleaks.tar.gz" | sha256sum --check --strict
+          tar -xzf gitleaks.tar.gz gitleaks
+
+      - name: Scan every commit in this pull request
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ -n "$BASE_SHA" ]; then
+            commits="$BASE_SHA..$HEAD_SHA"   # just the commits this pull request adds
+          else
+            commits="HEAD"                   # manual run: the whole history of this branch
+          fi
+          # gitleaks reports "no leaks found" even when git fails and it scans
+          # nothing, so count the commits ourselves and check it really looked.
+          expected="$(git rev-list --count "$commits")"
+          status=0
+          "$RUNNER_TEMP/gitleaks" git . --config .gitleaks.toml --redact --no-banner \
+            --log-opts="$commits" --report-format json \
+            --report-path "$RUNNER_TEMP/gitleaks.json" 2> "$RUNNER_TEMP/gitleaks.log" || status=$?
+          cat "$RUNNER_TEMP/gitleaks.log"
+          python3 .github/scripts/report_findings.py gitleaks "$RUNNER_TEMP/gitleaks.json" "$status" \
+            --gitleaks-log "$RUNNER_TEMP/gitleaks.log" --expected-commits "$expected"
+
+  sast:
+    name: Code scan (Semgrep)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      # Pinned by digest: the exact Semgrep build we tested (version 1.178.0).
+      SEMGREP_IMAGE: "semgrep/semgrep:1.178.0@sha256:32e459968daabe7ab86968184a29109b9564aa00392401156f9788452b42786b"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Scan the code with Semgrep's default rules
+        run: |
+          status=0
+          docker run --rm --volume "$PWD:/src" --workdir /src "$SEMGREP_IMAGE" \
+            semgrep scan --config p/default --metrics=off --error --json --quiet \
+            > "$RUNNER_TEMP/semgrep.json" || status=$?
+          python3 .github/scripts/report_findings.py semgrep "$RUNNER_TEMP/semgrep.json" "$status"

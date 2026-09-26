@@ -1,0 +1,14 @@
+# gitleaks configuration for the lab.
+# We keep every built-in gitleaks rule and add one for our own key format.
+# Real companies do the same: give your keys a recognizable prefix so a
+# scanner can spot them. Scanners only find the patterns they are taught.
+title = "WSC DevSecOps lab"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "wsclab-session-key"
+description = "Team Directory session-signing key (wsclab_sk_ prefix)"
+regex = '''\bwsclab_sk_[0-9a-f]{32}\b'''
+keywords = ["wsclab_sk_"]
