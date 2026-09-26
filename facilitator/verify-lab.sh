@@ -437,6 +437,34 @@ expect "Detached, nothing to save: stops" 1 $?
 grep -q "not on a branch" "$work/script.log" && pass "Detached, nothing to save: says so" ||
   fail "Detached, nothing to save: says so"
 
+# The gate edit was made on github.com, and this codespace has the same edit unsaved.
+make_copy sameedit
+run_script sameedit use-example-change.sh
+clone_copy sameedit sameedit-web
+(cd "$work/sameedit-web" && git switch -q agent-change &&
+  sed -i.bak 's/^  # pull_request:/  pull_request:/' "$workflow" && rm -f "$workflow.bak" &&
+  git commit -qam "edit made on github.com" && git push -q)
+edit_gate_line sameedit
+run_script sameedit save-my-change.sh
+expect "Same edit here and on github.com: catches up and succeeds" 0 $?
+grep -q "now matches GitHub" "$work/script.log" && pass "Same edit here and on github.com: says the branch matches" ||
+  fail "Same edit here and on github.com: says the branch matches"
+
+# No connection to GitHub: a plain message, not git's raw error.
+make_copy offline
+git -C "$work/offline" remote set-url origin "$work/no-such-remote.git"
+run_script offline save-my-change.sh
+expect "No connection: stops" 1 $?
+grep -q "Could not reach GitHub" "$work/script.log" && pass "No connection: says so" || fail "No connection: says so"
+
+# The workflow file was deleted and the deletion saved; the backup still works.
+make_copy nogate
+run_script nogate use-example-change.sh
+(cd "$work/nogate" && git rm -q "$workflow" && git commit -qm "deleted the gate file")
+run_script nogate turn-on-gates.sh
+expect "Gate file deleted: turn-on-gates.sh restores it and turns the gates on" "0 on" \
+  "$? $(gates_on nogate origin/agent-change)"
+
 # An agent created a folder of tools (like a virtualenv) that isn't ignored.
 make_copy bulky
 mkdir -p "$work/bulky/tools" && for i in $(seq 1 60); do echo "x$i" >"$work/bulky/tools/f$i.py"; done

@@ -9,7 +9,7 @@ cd "$(git rev-parse --show-toplevel)"
 fetch_origin
 
 workflow=".github/workflows/security-gates.yml"
-git checkout --quiet -- "$workflow"   # drop any half-done edit; we rewrite it below
+git checkout --quiet -- "$workflow" 2>/dev/null || true   # drop any half-done edit; we rewrite it below
 if [ "$(git branch --show-current)" = "main" ]; then
   pr_branch="$(existing_pr_branch)"
   [ -n "$pr_branch" ] || die "Do LAB step 2 first, so you have a pull request for the gates to check."

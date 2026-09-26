@@ -23,9 +23,12 @@ if [ "$branch" = "main" ] || [ -z "$branch" ]; then
       die "Do LAB step 2 first, so you have a pull request for the gates to check."
     # Anything committed on main by mistake becomes unsaved edits again, so it
     # moves to your branch with you. Nothing is lost.
+    before="$(git rev-parse HEAD)"
     [ -z "$(git rev-list origin/main..HEAD)" ] || git reset --quiet origin/main
-    git switch --quiet "$pr_branch" ||
+    if ! git switch --quiet "$pr_branch"; then
+      git reset --quiet "$before"   # put main back exactly as it was
       die "Could not switch to your '$pr_branch' branch. Raise your hand."
+    fi
     branch="$pr_branch"
     changes="$(git status --porcelain)"
     say "Switched to your '$branch' branch, where your pull request is."
@@ -33,7 +36,7 @@ if [ "$branch" = "main" ] || [ -z "$branch" ]; then
     # Step 2, option A: your agent's work goes on its own branch. If you already
     # have a lab branch, this codespace is on main by mistake: don't guess.
     [ -z "$pr_branch" ] ||
-      die "You already have your '$pr_branch' branch from step 2, and this codespace is on main. Turning on the gates? Edit security-gates.yml first, then run this again. Otherwise raise your hand."
+      die "You already have your '$pr_branch' branch from step 2, and this codespace is on main. Turning on the gates? Edit security-gates.yml first, then run this again. Want to try your own agent as well? Raise your hand."
     branch="my-agent-change"
     git switch --quiet --create "$branch"
     # If anything was committed on main by mistake, it moved to the branch; reset main.
@@ -41,7 +44,16 @@ if [ "$branch" = "main" ] || [ -z "$branch" ]; then
   fi
 fi
 [ -n "$branch" ] || die "You're not on a branch. Run: bash scripts/use-example-change.sh"
-[ "$branch" = "main" ] || catch_up
+if [ "$branch" != "main" ]; then
+  catch_up
+  changes="$(git status --porcelain)"
+  if [ -z "$changes" ] && [ "$CAUGHT_UP" = 1 ] &&
+     [ -z "$(git rev-list "origin/$branch..HEAD")" ]; then
+    say "Your branch now matches GitHub. Nothing else to save."
+    print_pr_link "$branch"
+    exit 0
+  fi
+fi
 
 if [ -n "$changes" ]; then
   if grep -q 'security-gates.yml' <<<"$changes"; then

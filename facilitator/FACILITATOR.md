@@ -180,7 +180,8 @@ Open `.github/workflows/security-gates.yml` on the projector:
 - [ ] Check the published branches are the tested ones (no output means they match):
       ```bash
       git fetch origin && for b in main agent-output-example agent-output-after-gates reference-solution; do
-        [ "$(git rev-parse "$b")" = "$(git rev-parse --verify --quiet "origin/$b")" ] || echo "$b DIFFERS"
+        [ "$(git rev-parse --verify --quiet "refs/heads/$b")" = "$(git rev-parse --verify --quiet "origin/$b")" ] ||
+          echo "$b DIFFERS (or is missing here or on GitHub)"
       done
       ```
 - [ ] In a demo copy of your own, run the whole lab as Option B and leave the PR

@@ -66,9 +66,8 @@ for pin in $pinned_files; do
 done
 
 if git diff --cached --quiet; then
-  say "The example change is already on main (someone merged it). You're on '$branch': go on to step 3."
+  say "The example change is already on main (someone merged it). You're on '$branch': go on to step 3. After you turn on the gates, the script prints your pull request link."
   push_if_needed
-  print_pr_link "$branch"
   exit 0
 fi
 git commit --quiet \
