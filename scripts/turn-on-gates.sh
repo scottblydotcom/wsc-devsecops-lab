@@ -6,16 +6,18 @@ here="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=scripts/lib.sh
 source "$here/lib.sh"
 cd "$(git rev-parse --show-toplevel)"
-git fetch --quiet origin
+fetch_origin
 
 workflow=".github/workflows/security-gates.yml"
+git checkout --quiet -- "$workflow"   # drop any half-done edit; we rewrite it below
 if [ "$(git branch --show-current)" = "main" ]; then
   pr_branch="$(existing_pr_branch)"
   [ -n "$pr_branch" ] || die "Do LAB step 2 first, so you have a pull request for the gates to check."
-  git checkout --quiet -- "$workflow"   # drop any half-done edit on main
   git switch --quiet "$pr_branch" || die "Could not switch to your '$pr_branch' branch. Raise your hand."
   say "Switched to your '$pr_branch' branch, where your pull request is."
 fi
+[ -n "$(git branch --show-current)" ] || die "You're not on a branch. Run: bash scripts/use-example-change.sh"
+catch_up   # so "already on" below reflects what GitHub has
 
 git show "origin/main:$workflow" > "$workflow"   # start again from the original file
 sed -i.bak 's/^  # pull_request:/  pull_request:/' "$workflow" && rm -f "$workflow.bak"

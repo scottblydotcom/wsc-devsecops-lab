@@ -47,9 +47,12 @@ jobs:
         run: |
           # Every commit, not just the latest files. A key that was deleted in a
           # later commit, or already merged, is still in history, so still leaked.
+          # Code can't switch off its own findings: ignore inline "gitleaks:allow"
+          # comments, and delete any .gitleaksignore the pull request brought.
+          rm -f .gitleaksignore
           status=0
           "$RUNNER_TEMP/gitleaks" git . --config .gitleaks.toml --redact --no-banner \
-            --log-opts=HEAD --report-format json \
+            --ignore-gitleaks-allow --log-opts=HEAD --report-format json \
             --report-path "$RUNNER_TEMP/gitleaks.json" 2> "$RUNNER_TEMP/gitleaks.log" || status=$?
           cat "$RUNNER_TEMP/gitleaks.log"
           # gitleaks says "no leaks found" even when git fails and it scans

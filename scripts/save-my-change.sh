@@ -8,7 +8,7 @@ here="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=scripts/lib.sh
 source "$here/lib.sh"
 cd "$(git rev-parse --show-toplevel)"
-git fetch --quiet origin
+fetch_origin
 
 changes="$(git status --porcelain)"
 branch="$(git branch --show-current)"
@@ -16,9 +16,9 @@ branch="$(git branch --show-current)"
 if [ "$branch" = "main" ] || [ -z "$branch" ]; then
   # Everything that differs from GitHub's main, saved to git or not.
   touched="$(git diff --name-only origin/main --)"
+  pr_branch="$(existing_pr_branch)"
   if grep -q 'security-gates.yml' <<<"$changes$touched"; then
     # Step 3 in a fresh codespace: the gates belong on your step 2 branch.
-    pr_branch="$(existing_pr_branch)"
     [ -n "$pr_branch" ] ||
       die "Do LAB step 2 first, so you have a pull request for the gates to check."
     # Anything committed on main by mistake becomes unsaved edits again, so it
@@ -30,15 +30,18 @@ if [ "$branch" = "main" ] || [ -z "$branch" ]; then
     changes="$(git status --porcelain)"
     say "Switched to your '$branch' branch, where your pull request is."
   elif [ -n "$changes" ] || [ -n "$(git rev-list origin/main..HEAD)" ]; then
-    # Step 2, option A: your agent's work goes on its own branch.
+    # Step 2, option A: your agent's work goes on its own branch. If you already
+    # have a lab branch, this codespace is on main by mistake: don't guess.
+    [ -z "$pr_branch" ] ||
+      die "You already have your '$pr_branch' branch from step 2, and this codespace is on main. Turning on the gates? Edit security-gates.yml first, then run this again. Otherwise raise your hand."
     branch="my-agent-change"
-    branch_exists "$branch" &&
-      die "You already saved an agent change. Run: git switch $branch   then run this again."
     git switch --quiet --create "$branch"
     # If anything was committed on main by mistake, it moved to the branch; reset main.
     git branch --quiet --force main origin/main
   fi
 fi
+[ -n "$branch" ] || die "You're not on a branch. Run: bash scripts/use-example-change.sh"
+[ "$branch" = "main" ] || catch_up
 
 if [ -n "$changes" ]; then
   if grep -q 'security-gates.yml' <<<"$changes"; then

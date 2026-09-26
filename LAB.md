@@ -120,8 +120,10 @@ Look in `app.py` for the route it added.)
 
 **Take-home challenges**
 - Ask your agent to fix what the gates found. Does the code scan go green? The
-  secret scan stays red, because the key is still in the git history. In real
-  life, the fix for a leaked key is a new key.
+  secret scan should stay red, because the key is still in the git history. In
+  real life, the fix for a leaked key is a new key. If your agent got the secret
+  scan to go green, look at what it changed: an agent editing its own gate is a
+  finding too.
 - Write the test the agent didn't write, for what you saw in step 4.
 - Compare with the `reference-solution` branch of the
   [template repository](https://github.com/scottblydotcom/wsc-devsecops-lab/tree/reference-solution).
@@ -136,6 +138,7 @@ Look in `app.py` for the route it added.)
 | `Address already in use` | An older copy of the app is still running, with the old code. Close every terminal with its 🗑 trash-can icon, open a new one (**Ctrl+`**), and run `python app.py` again. |
 | The pop-up for port 5000 never appeared | **Ports** tab next to the terminal → globe icon on port 5000 |
 | A workflow says it's waiting for approval | Click it, then **Approve and run workflow**. It's your repository. |
+| A script says your branch on GitHub has a change this codespace doesn't have | Your edit on github.com (or in another codespace) already reached GitHub. Check your pull request. |
 | The push to GitHub was refused | Run the same command again. Still refused in step 3? Make the edit on github.com instead: on your repository page, pick your branch in the branch menu, open `.github/workflows/security-gates.yml`, click the ✏️ pencil, delete the `# ` before `pull_request:`, and click **Commit changes**. |
 | You're in a brand-new codespace | The step 2 and step 3 scripts find your branch by themselves. Before step 4, run `bash scripts/use-example-change.sh` again (Option A: `git switch my-agent-change`). |
 | The codespace stopped | It stops after 30 idle minutes. Click **Restart codespace**. |

@@ -97,8 +97,10 @@ Open `.github/workflows/security-gates.yml` on the projector:
   custom rule for our key format (`.gitleaks.toml`). A key in some other
   format could sail through. Semgrep's defaults also skip `tests/`. And gitleaks
   can't see a secret that first appears inside a merge commit.
-- **A pull request can edit its own gates.** Code can carry `# nosemgrep`
-  (this workflow ignores it with `--disable-nosem`), and a PR can loosen
+- **A pull request can edit its own gates.** Code can carry `# nosemgrep` or a
+  `gitleaks:allow` comment, or a PR can add a `.gitleaksignore` file. This
+  workflow ignores all three (`--disable-nosem`, `--ignore-gitleaks-allow`, and
+  deleting `.gitleaksignore` before the scan). But a PR can still loosen
   `.gitleaks.toml` or the workflow itself. That's why real teams add CODEOWNERS
   review on `.github/` and scanner config.
 - **`AGENTS.md` / `CLAUDE.md`**: instructions every agent reads before touching
@@ -138,10 +140,11 @@ Open `.github/workflows/security-gates.yml` on the projector:
 | Codespace is slow or stuck on "Setting up" | Reload the browser tab once. Still stuck after 5 min: pair up. |
 | A workflow run is **waiting for approval** | Since July 2026 GitHub may hold runs it judges suspicious, even in your own repo. Attendee clicks the run → **Approve and run workflow**. |
 | Push rejected when turning on gates (workflow-file permission) | Use the github.com edit in LAB's troubleshooting table: branch menu → their PR branch → `.github/workflows/security-gates.yml` → pencil → delete the `# ` before `pull_request:` → **Commit changes** to that branch. |
-| No Security gates checks, or a workflow-error banner | `bash scripts/turn-on-gates.sh`. It restores the file, makes the edit correctly, and pushes. |
-| Option A agent stalled or made a mess | `bash scripts/use-example-change.sh`. It sets the agent's unsaved work aside and continues with Option B. To get the work back later: `git switch main`, then `git stash pop`. |
+| No Security gates checks, or a workflow-error banner | `bash scripts/turn-on-gates.sh`. It restores the file, makes the edit correctly, and pushes. If the bad edit was made on github.com, fix it there instead (pencil icon on the file). |
+| Option A agent stalled or made a mess | `bash scripts/use-example-change.sh`. It sets the agent's unsaved work aside and continues with Option B. To get the work back later, switch to the branch the script names, then `git stash pop`. |
 | Option A **Build and test** is red | Their agent's code. Ask the agent to fix it, or switch to Option B. |
 | A script says a push was refused | Run the same command again: the scripts push anything that didn't make it. |
+| A script says the branch on GitHub has a change the codespace doesn't have | The github.com edit (or another codespace) already got there: check the PR. To make the codespace match GitHub, the facilitator runs `git fetch && git reset --hard origin/<branch>` there, which throws away that codespace's unpushed commits. |
 | `use-example-change.sh` can't download the example | Wi-Fi. It needs to reach github.com. Hotspot, or pair up. |
 | Actions queued for minutes (GitHub incident) | Check <https://www.githubstatus.com>. Switch to your projector demo copy, which has each state already run. |
 | Venue Wi-Fi fails | Phone hotspot for the projector machine; play the recorded walkthrough; keep the discussion going. |
@@ -163,22 +166,30 @@ Open `.github/workflows/security-gates.yml` on the projector:
 
 **By Tue Sep 29**
 - [ ] Send [SETUP-EMAIL.md](SETUP-EMAIL.md) (after the dry run passes). After this,
-      **freeze `main` and the three example branches**: add a ruleset that blocks
-      force-push and deletion on all four. Attendees make their copy in advance, a
-      copy doesn't pick up later changes, and the step-2 script checks the example
-      against hashes pinned in that copy.
+      **freeze `main` and the three example branches**: add a ruleset on all four
+      with **Restrict updates**, **Restrict deletions** and **Block force pushes**,
+      and no bypass list. Attendees make their copy in advance, a copy doesn't pick
+      up later changes, and the step-2 script checks the example against hashes
+      pinned in that copy, so even an ordinary push to `agent-output-example` would
+      break step 2. Unfreezing means deliberately disabling the ruleset, and it
+      triggers the second-copy plan in the setup email notes.
 
 **Oct 2 (day before)**
 - [ ] Re-run `verify-lab.sh`. Semgrep downloads its `p/default` rules at run time,
       so a rule change on semgrep.dev could change what's caught.
-- [ ] Check the published branches are the tested ones:
-      `git fetch origin && git branch -vv` shows no "ahead" or "behind" on any of the four.
+- [ ] Check the published branches are the tested ones (no output means they match):
+      ```bash
+      git fetch origin && for b in main agent-output-example agent-output-after-gates reference-solution; do
+        [ "$(git rev-parse "$b")" = "$(git rev-parse --verify --quiet "origin/$b")" ] || echo "$b DIFFERS"
+      done
+      ```
 - [ ] In a demo copy of your own, run the whole lab as Option B and leave the PR
       red. Set up the step-4 projector recipe above. Those are your fallbacks.
 - [ ] Record a short screen capture of the full lab (last-resort fallback).
 - [ ] Charge the phone hotspot.
 
-**Maintenance (before the email only).** The example branches are single commits
+**Maintenance (before the email only; after it, disable the freeze ruleset first
+and treat any change as the second-copy plan).** The example branches are single commits
 on top of `main`. If `main` changes, rebase them, re-check, and only then push. If
 `app.py`, `db.py` or `tests/test_profile.py` change on the example branch, update
 the pinned hashes in `scripts/use-example-change.sh` first (`git rev-parse

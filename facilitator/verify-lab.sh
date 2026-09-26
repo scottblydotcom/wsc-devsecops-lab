@@ -53,6 +53,10 @@ fi
 py="$work/venv/bin/python"
 [ -x "$py" ] && pass "python venv: $("$py" --version)" || { fail "python venv"; exit 1; }
 grep -q -- '--disable-nosem' "$workflow" && pass "workflow ignores # nosemgrep" || fail "workflow ignores # nosemgrep"
+grep -q -- '--ignore-gitleaks-allow' "$workflow" && pass "workflow ignores gitleaks:allow comments" ||
+  fail "workflow ignores gitleaks:allow comments"
+grep -q -- 'rm -f .gitleaksignore' "$workflow" && pass "workflow deletes .gitleaksignore before scanning" ||
+  fail "workflow deletes .gitleaksignore before scanning"
 
 # gate TOOL DIR [LOG_OPTS]: run one security gate the way the workflow does and
 # print "EXIT RULES" (report_findings.py exit status, sorted unique rule ids).
@@ -64,7 +68,8 @@ gate() {
     GITHUB_STEP_SUMMARY="$work/summary-$tool-$(basename "$dir").md"
     export GITHUB_STEP_SUMMARY
     if [ "$tool" = gitleaks ]; then
-      gitleaks git . --config .gitleaks.toml --redact --no-banner --log-opts="$log_opts" \
+      rm -f .gitleaksignore
+      gitleaks git . --config .gitleaks.toml --redact --no-banner --ignore-gitleaks-allow --log-opts="$log_opts" \
         --report-format json --report-path "$work/gl.json" 2>"$work/gl.log" || status=$?
       "$py" .github/scripts/report_findings.py gitleaks "$work/gl.json" "$status" \
         --gitleaks-log "$work/gl.log" --log-opts HEAD >"$work/report.log" 2>&1
@@ -187,6 +192,24 @@ git clone -q "$work/main" "$work/unicode" && (
     printf 'x = 1\n' >"perfil_usuário.py" && git add -A && git commit -qm unicode
 )
 expect "semgrep coverage check handles non-ASCII file names" "0 -" "$(gate semgrep "$work/unicode")"
+# Code can't switch off its own secret finding.
+git clone -q "$work/main" "$work/allowcomment" && (
+  cd "$work/allowcomment" && git config user.email t@example.com && git config user.name t &&
+    git -C "$repo" show agent-output-example:app.py >app.py &&
+    sed -i.bak 's/\(wsclab_sk_[0-9a-f]*"\))/\1)  # gitleaks:allow/' app.py && rm -f app.py.bak &&
+    git commit -qam "key with an allow comment"
+)
+expect "planted one gitleaks:allow comment" 1 "$(grep -c 'gitleaks:allow' "$work/allowcomment/app.py")"
+expect "secret scan ignores gitleaks:allow comments" "1 wsclab-session-key" "$(gate gitleaks "$work/allowcomment")"
+git clone -q "$work/agent-output-example" "$work/ignorefile" && (
+  cd "$work/ignorefile" && git config user.email t@example.com && git config user.name t &&
+    gitleaks git . --config .gitleaks.toml --no-banner --report-format json --report-path "$work/fp.json" 2>/dev/null
+  "$py" -c 'import json,sys; print(json.load(open(sys.argv[1]))[0]["Fingerprint"])' "$work/fp.json" >.gitleaksignore &&
+    git add .gitleaksignore && git commit -qm "ignore the finding"
+)
+(cd "$work/ignorefile" && gitleaks git . --config .gitleaks.toml --no-banner >/dev/null 2>&1)
+expect "a .gitleaksignore would hide the key if left in place (so the next check means something)" 0 $?
+expect "secret scan deletes .gitleaksignore and still finds the key" "1 wsclab-session-key" "$(gate gitleaks "$work/ignorefile")"
 
 section "Attendee helper scripts, in a template-style copy (no shared history)"
 # A "Use this template" copy is one fresh commit with no history in common with
@@ -256,12 +279,16 @@ grep -q "already on" "$work/script.log" && pass "turn-on-gates.sh says the gates
   fail "turn-on-gates.sh says the gates are already on"
 run_script optionb-fresh save-my-change.sh
 expect "save-my-change.sh with nothing new stops" 1 $?
+# Back in the first codespace, which is now behind GitHub.
+run_script optionb turn-on-gates.sh
+expect "Codespace behind GitHub: turn-on-gates.sh catches up" 0 $?
+grep -q "already on" "$work/script.log" && pass "Codespace behind GitHub: says the gates are already on" ||
+  fail "Codespace behind GitHub: says the gates are already on"
 
 # Same, but the attendee clicked Commit on main in VS Code before running it.
-# (Reset the remote branch to the agent change alone, gates off.)
-git -C "$work/optionb" push -q origin --delete agent-change
-run_script optionb use-example-change.sh
-clone_copy optionb optionb-committed
+make_copy committedgate
+run_script committedgate use-example-change.sh
+clone_copy committedgate optionb-committed
 edit_gate_line optionb-committed
 (cd "$work/optionb-committed" && git commit -qam "enable gates (committed on main)")
 run_script optionb-committed save-my-change.sh
@@ -302,6 +329,10 @@ make_copy merged
 run_script merged use-example-change.sh
 (cd "$work/merged" && git switch -q main && git merge -q --no-ff --no-edit agent-change &&
   git push -q origin main && git switch -q agent-change)
+run_script merged use-example-change.sh
+expect "Merged at step 2: re-running step 2 succeeds" 0 $?
+grep -q "already on main" "$work/script.log" && pass "Merged at step 2: says the change is already on main" ||
+  fail "Merged at step 2: says the change is already on main"
 run_script merged turn-on-gates.sh
 expect "Merged at step 2: turn-on-gates.sh still works" 0 $?
 (cd "$work/merged" && git fetch -q origin && git switch -q --detach origin/main &&
@@ -366,6 +397,45 @@ run_script early save-my-change.sh
 expect "Step 3 before step 2: stops" 1 $?
 grep -q "Do LAB step 2 first" "$work/script.log" && pass "Step 3 before step 2: says to do step 2 first" ||
   fail "Step 3 before step 2: says to do step 2 first"
+
+# The branch changed both on GitHub (an edit on github.com) and in the codespace.
+make_copy diverged
+run_script diverged use-example-change.sh
+clone_copy diverged diverged-web
+(cd "$work/diverged-web" && git switch -q agent-change &&
+  sed -i.bak 's/^  # pull_request:/  pull_request:/' "$workflow" && rm -f "$workflow.bak" &&
+  git commit -qam "edit made on github.com" && git push -q)
+(cd "$work/diverged" && echo "# note" >>README.md && git commit -qam "a local commit")
+run_script diverged save-my-change.sh
+expect "Branch changed on GitHub and here: stops" 1 $?
+grep -q "has a change this codespace doesn't have" "$work/script.log" &&
+  pass "Branch changed on GitHub and here: says so" || fail "Branch changed on GitHub and here: says so"
+
+# A stray edit on main in a fresh codespace, with a step 2 branch already made.
+make_copy stray
+run_script stray use-example-change.sh
+clone_copy stray stray-fresh
+echo "# stray" >>"$work/stray-fresh/README.md"
+run_script stray-fresh save-my-change.sh
+expect "Stray edit on main with a step 2 branch: stops, no new branch" "1 no" \
+  "$? $(remote_has stray-fresh my-agent-change)"
+
+# The branch was deleted on GitHub ("Delete branch" button); the codespace still
+# remembers it.
+make_copy pruned
+run_script pruned use-example-change.sh
+clone_copy pruned pruned-other
+git -C "$work/pruned-other" push -q origin --delete agent-change
+run_script pruned use-example-change.sh
+expect "Branch deleted on GitHub: re-running pushes it again" "0 yes" "$? $(remote_has pruned agent-change)"
+
+# Detached HEAD with nothing to save.
+make_copy detached
+git -C "$work/detached" switch -q --detach origin/main
+run_script detached save-my-change.sh
+expect "Detached, nothing to save: stops" 1 $?
+grep -q "not on a branch" "$work/script.log" && pass "Detached, nothing to save: says so" ||
+  fail "Detached, nothing to save: says so"
 
 # An agent created a folder of tools (like a virtualenv) that isn't ignored.
 make_copy bulky

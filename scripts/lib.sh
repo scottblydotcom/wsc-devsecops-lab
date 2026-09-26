@@ -9,6 +9,9 @@ PR_BRANCHES="agent-change my-agent-change"
 say() { printf '\n\033[1m%s\033[0m\n' "$*"; }
 die() { printf '\n\033[1;31mStopped: %s\033[0m\n\n' "$*" >&2; exit 1; }
 
+# Refresh what we know about GitHub, forgetting branches deleted there.
+fetch_origin() { git fetch --prune --quiet origin; }
+
 # owner/repo of *your* copy, for building links.
 my_repo() {
   if [ -n "${GITHUB_REPOSITORY:-}" ]; then
@@ -34,10 +37,38 @@ existing_pr_branch() {
   done | sort -rn | head -1 | cut -d' ' -f2
 }
 
+# Set unsaved work aside (git stash) and say how to get it back.
+set_aside() {
+  local from
+  from="$(git branch --show-current)"
+  git stash push --quiet --include-untracked -m "$1"
+  say "Your unsaved changes were set aside, not deleted. (To get them back: git switch ${from:-main}, then git stash pop)"
+}
+
+# If GitHub's copy of this branch moved on (another codespace, or an edit on
+# github.com), catch up when that's safe. Never leaves a half-finished merge.
+catch_up() {
+  local branch
+  branch="$(git branch --show-current)"
+  [ -n "$branch" ] || return 0
+  git show-ref --verify --quiet "refs/remotes/origin/$branch" || return 0
+  if git merge-base --is-ancestor "origin/$branch" HEAD; then
+    return 0   # up to date, or only ahead
+  fi
+  if git merge-base --is-ancestor HEAD "origin/$branch"; then
+    git merge --quiet --ff-only "origin/$branch" >/dev/null 2>&1 ||
+      die "GitHub has newer changes on '$branch' that clash with files you changed here. Raise your hand."
+    return 0
+  fi
+  die "Your branch on GitHub has a change this codespace doesn't have (an edit on github.com, or another codespace). Check your pull request; if you need more, raise your hand."
+}
+
 # Push the current branch if GitHub doesn't have all of it yet.
 push_if_needed() {
   local branch
   branch="$(git branch --show-current)"
+  [ -n "$branch" ] || die "You're not on a branch. Run: bash scripts/use-example-change.sh"
+  catch_up
   if git show-ref --verify --quiet "refs/remotes/origin/$branch" &&
      [ -z "$(git rev-list "origin/$branch..HEAD")" ]; then
     return 0
