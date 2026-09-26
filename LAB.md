@@ -16,14 +16,14 @@ Made your copy before the workshop (setup email)? Open it at
 `github.com/YOUR-USERNAME/wsc-devsecops-lab` and start at item 2.
 
 1. Open this link while signed in to GitHub:
-   **[Create my copy of the lab](https://github.com/new?template_owner=scottblydotcom&template_name=wsc-devsecops-lab&owner=@me&name=wsc-devsecops-lab&visibility=public)**
+   **[Create my copy of the lab](https://github.com/new?template_owner=scottblydotcom&template_name=wsc-devsecops-lab&name=wsc-devsecops-lab&visibility=public)**
    - Leave **Include all branches** unchecked.
    - Keep it **Public** (public repositories get free pipeline minutes).
    - Click **Create repository**.
 2. On your new repository's page, click the green **Code** button, then the
    **Codespaces** tab, then **Create codespace on main**.
-3. Wait about 2 minutes. A code editor opens in your browser. The panel at the
-   bottom is the **terminal**. Wait until it says `Lab ready`.
+3. Wait about 2 minutes while a code editor opens in your browser. The panel at
+   the bottom is the **terminal**. (No terminal? Press **Ctrl+`**, the key left of 1.)
 4. Click in the terminal, type this, and press Enter:
    ```bash
    python app.py
@@ -33,7 +33,8 @@ Made your copy before the workshop (setup email)? Open it at
    then the globe icon on port 5000.)
 6. You should see a line of text starting with `{"app":"Team Directory API`. It works!
    Leave that browser tab open.
-7. Back in the Codespace, click in the terminal and press **Ctrl+C** to stop the app.
+7. Back in the Codespace, click in the terminal and press **Ctrl+C** to stop the
+   app. (On a Mac this is **Ctrl** too, not Cmd.)
 
 ## Step 2 · Let an AI agent write a feature (10 min)
 
@@ -43,8 +44,8 @@ Your team asked for this:
 
 **Option A: you have an AI agent (for example GitHub Copilot).** Open its chat
 (Copilot: **Ctrl+Alt+I**, or **Ctrl+Cmd+I** on a Mac), switch it to
-**Agent** mode, paste the request above, and accept the changes it makes. Then
-run this in the terminal:
+**Agent** mode, paste the request above, and click **Keep** on the changes it
+makes. Then run this in the terminal:
 ```bash
 bash scripts/save-my-change.sh
 ```
@@ -60,29 +61,36 @@ bash scripts/use-example-change.sh
 1. The script prints a link. Hold **Ctrl** (**Cmd** on a Mac) and click it. If
    the browser asks, allow it to open the site.
 2. Click **Create pull request**.
-3. Scroll down to the checks. Within a couple of minutes **Build and test** turns ✅ green.
-   Lint passed. Every unit test passed, including the ones the agent wrote.
+3. Scroll down to the checks. Within a couple of minutes **Build and test** turns ✅ green:
+   lint passed, and every test in the `tests` folder passed, including the agent's.
 
-🤔 **Would you merge this?**
+🤔 **Would you merge this?** Answer with a show of hands, but **don't click Merge**:
+the lab keeps using this pull request.
+
+(Option A: if **Build and test** is ❌ red for you, that's your agent's code. Ask
+your agent to fix it, run `bash scripts/save-my-change.sh` again, or switch to
+Option B.)
 
 ## Step 3 · Turn on the security gates (12 min)
 
 1. In the Codespace, press **Ctrl+P** (**Cmd+P** on a Mac), type
    `security-gates`, and press Enter to open the file.
 2. Find the line that starts with `# pull_request:`. Click anywhere on it and press
-   **Ctrl+/** (**Cmd+/** on a Mac). The `#` disappears. That one line turns the gates on.
+   **Ctrl+/** (**Cmd+/** on a Mac). The `#` at the start disappears, so the line
+   now starts with `pull_request:`. (The note later on that line keeps its `#`.
+   That's fine.) That one line turns the gates on.
 3. Save it to GitHub:
    ```bash
    bash scripts/save-my-change.sh
    ```
 4. Go back to your pull request tab. New checks appear under **Security gates**.
-   In a couple of minutes they turn ❌ red.
+   Option B: in a couple of minutes they turn ❌ red. (Option A: see the note below.)
 5. Click **Details** next to a red check, then **Summary** at the top left, to see
    what each gate found and what it means. The **Files changed** tab of the pull
    request marks the exact lines too.
 
-Trouble with the edit? Run `bash scripts/turn-on-gates.sh` instead. It does
-steps 1 to 3 for you.
+Trouble with the edit, or no **Security gates** checks after 3 minutes? Run
+`bash scripts/turn-on-gates.sh`. It does steps 1 to 3 for you.
 
 If you used your own agent (Option A), your gates may catch different things, or
 nothing at all. Compare with a neighbor who used Option B.
@@ -95,6 +103,7 @@ nothing at all. Compare with a neighbor who used Option B.
    ```
 2. In the app's browser tab, go to the address bar. Replace everything after
    `.app.github.dev` with `/login/alice` and press Enter. You're logged in as Alice.
+   (Pretend this login checks a password. It doesn't, only to keep the lab short.)
 3. Now go to `/api/users/1/profile`. That's Alice's own profile: fine.
 4. Change the `1` to a `2`.
 
@@ -110,10 +119,11 @@ Look in `app.py` for the route it added.)
    **⋯** next to your codespace, and choose **Delete**. Your repository stays.
 
 **Take-home challenges**
-- Ask your agent to fix what the gates found. Do the gates go green? Is the app safe now?
-- Write the test the agent didn't write: logged in as Alice, asking for Bob's
-  profile should be refused (HTTP 403).
-- Compare your fix with the `reference-solution` branch of the
+- Ask your agent to fix what the gates found. Does the code scan go green? The
+  secret scan stays red, because the key is still in the git history. In real
+  life, the fix for a leaked key is a new key.
+- Write the test the agent didn't write, for what you saw in step 4.
+- Compare with the `reference-solution` branch of the
   [template repository](https://github.com/scottblydotcom/wsc-devsecops-lab/tree/reference-solution).
 
 ---
@@ -122,9 +132,11 @@ Look in `app.py` for the route it added.)
 
 | What you see | What to do |
 |---|---|
-| A workflow says it's waiting for approval | Click it, then **Approve and run workflow**. It's your repository. |
+| You typed a command and nothing happened | The app is still running in that terminal. Press **Ctrl+C**, then type the command again. |
+| `Address already in use` | An older copy of the app is still running, with the old code. Close every terminal with its 🗑 trash-can icon, open a new one (**Ctrl+`**), and run `python app.py` again. |
 | The pop-up for port 5000 never appeared | **Ports** tab next to the terminal → globe icon on port 5000 |
-| `Address already in use` | The app is already running in another terminal. Use that one, or close it. |
+| A workflow says it's waiting for approval | Click it, then **Approve and run workflow**. It's your repository. |
+| The push to GitHub was refused | Run the same command again. Still refused in step 3? Make the edit on github.com instead: on your repository page, pick your branch in the branch menu, open `.github/workflows/security-gates.yml`, click the ✏️ pencil, delete the `# ` before `pull_request:`, and click **Commit changes**. |
+| You're in a brand-new codespace | The step 2 and step 3 scripts find your branch by themselves. Before step 4, run `bash scripts/use-example-change.sh` again (Option A: `git switch my-agent-change`). |
 | The codespace stopped | It stops after 30 idle minutes. Click **Restart codespace**. |
-| You're in a brand-new codespace, after step 2 | Get back to your branch. Option B: run `bash scripts/use-example-change.sh` again. Option A: run `git switch my-agent-change` |
 | Anything else | Raise your hand, or pair up with a neighbor |

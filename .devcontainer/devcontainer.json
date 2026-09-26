@@ -3,7 +3,9 @@
 {
   "name": "WSC DevSecOps lab",
   "image": "mcr.microsoft.com/devcontainers/python:3.2-3.12-trixie@sha256:a00123df1ec4af04b4013fda8c27438b73b1817a24f6bcd3d61e2f6aa0800302",
-  "postCreateCommand": "pip install --disable-pip-version-check -r requirements-dev.txt && echo 'Lab ready. Start the app with: python app.py'",
+  // Dev container tools wait for this step before connecting the editor (the
+  // spec's default "waitFor"), so the first terminal has everything installed.
+  "updateContentCommand": "pip install --disable-pip-version-check -r requirements-dev.txt",
   // pip installs as the "vscode" user into ~/.local. Put that first on PATH so
   // "pytest" and "ruff" are the versions pinned in requirements-dev.txt.
   "remoteEnv": {
@@ -18,7 +20,7 @@
   },
   "customizations": {
     "vscode": {
-      "extensions": ["ms-python.python"],
+      "extensions": ["ms-python.python", "GitHub.copilot-chat"],
       "settings": {
         "files.autoSave": "afterDelay",
         "python.defaultInterpreterPath": "/usr/local/bin/python",

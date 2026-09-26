@@ -43,26 +43,19 @@ jobs:
           echo "${GITLEAKS_SHA256}  gitleaks.tar.gz" | sha256sum --check --strict
           tar -xzf gitleaks.tar.gz gitleaks
 
-      - name: Scan every commit in this pull request
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      - name: Scan the full git history
         run: |
-          if [ -n "$BASE_SHA" ]; then
-            commits="$BASE_SHA..$HEAD_SHA"   # just the commits this pull request adds
-          else
-            commits="HEAD"                   # manual run: the whole history of this branch
-          fi
-          # gitleaks reports "no leaks found" even when git fails and it scans
-          # nothing, so count the commits ourselves and check it really looked.
-          expected="$(git rev-list --count "$commits")"
+          # Every commit, not just the latest files. A key that was deleted in a
+          # later commit, or already merged, is still in history, so still leaked.
           status=0
           "$RUNNER_TEMP/gitleaks" git . --config .gitleaks.toml --redact --no-banner \
-            --log-opts="$commits" --report-format json \
+            --log-opts=HEAD --report-format json \
             --report-path "$RUNNER_TEMP/gitleaks.json" 2> "$RUNNER_TEMP/gitleaks.log" || status=$?
           cat "$RUNNER_TEMP/gitleaks.log"
+          # gitleaks says "no leaks found" even when git fails and it scans
+          # nothing, so the report script also checks that it scanned every commit.
           python3 .github/scripts/report_findings.py gitleaks "$RUNNER_TEMP/gitleaks.json" "$status" \
-            --gitleaks-log "$RUNNER_TEMP/gitleaks.log" --expected-commits "$expected"
+            --gitleaks-log "$RUNNER_TEMP/gitleaks.log" --log-opts HEAD
 
   sast:
     name: Code scan (Semgrep)
@@ -77,9 +70,10 @@ jobs:
           persist-credentials: false
 
       - name: Scan the code with Semgrep's default rules
+        # --disable-nosem: code can't switch off its own findings with "# nosemgrep".
         run: |
           status=0
           docker run --rm --volume "$PWD:/src" --workdir /src "$SEMGREP_IMAGE" \
-            semgrep scan --config p/default --metrics=off --error --json --quiet \
+            semgrep scan --config p/default --metrics=off --disable-nosem --error --json --quiet \
             > "$RUNNER_TEMP/semgrep.json" || status=$?
           python3 .github/scripts/report_findings.py semgrep "$RUNNER_TEMP/semgrep.json" "$status"

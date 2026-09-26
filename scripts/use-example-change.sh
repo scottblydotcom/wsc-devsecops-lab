@@ -5,27 +5,38 @@
 # applies a recorded example of an agent's change for the request in LAB.md.
 # It puts the change on a new branch and pushes it, ready for a pull request.
 set -euo pipefail
+here="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=scripts/lib.sh
-source "$(dirname "$0")/lib.sh"
+source "$here/lib.sh"
 cd "$(git rev-parse --show-toplevel)"
 
 branch="agent-change"
 example_branch="agent-output-example"
+# Pinned like the actions in our workflows: the Git blob id of each file the
+# example may change. Anything else that arrives is refused.
+pinned_files="app.py:e2ba78b14e7a2d78c3a64be1929287c9f251dd7e
+db.py:62d3df4a1452cb3adb03eeb0f37fa84adb8b5449
+tests/test_profile.py:387014e4b3ea7d2437bf0cc35e461963365fe1fe"
 
 git fetch --quiet origin
 # Already done (maybe in an earlier codespace)? Go back to that branch.
-if git show-ref --verify --quiet "refs/heads/$branch" ||
-   git show-ref --verify --quiet "refs/remotes/origin/$branch"; then
+if branch_exists "$branch"; then
   if [ "$(git branch --show-current)" != "$branch" ]; then
+    [ -z "$(git status --porcelain)" ] || git stash push --quiet --include-untracked -m "set aside by use-example-change.sh"
     git switch --quiet "$branch" ||
-      die "You already did this step, but could not switch to '$branch'. Ask a facilitator for help."
+      die "You already did this step, but could not switch to '$branch'. Raise your hand."
   fi
   say "You already did this step. You're on your '$branch' branch."
+  push_if_needed
   print_pr_link "$branch"
   exit 0
 fi
-[ -z "$(git status --porcelain)" ] ||
-  die "Some files have changes that are not saved to git yet. Ask a facilitator for help."
+
+# Switching from your own agent (Option A)? Set its unsaved work aside.
+if [ -n "$(git status --porcelain)" ]; then
+  git stash push --quiet --include-untracked -m "my agent attempt (set aside by use-example-change.sh)"
+  say "Your agent's unsaved changes were set aside, not deleted. (A facilitator can bring them back with: git stash pop)"
+fi
 
 say "Downloading the example agent change..."
 if git fetch --quiet "$TEMPLATE_REPO" "$example_branch" 2>/dev/null ||
@@ -35,20 +46,14 @@ else
   die "Could not download the example. Check your internet connection and run this again."
 fi
 
-# Which files did the agent touch? Compare the example with the commit it was
-# built on when we have it; otherwise compare it with your main branch.
-if git rev-parse --quiet --verify "$example~1" >/dev/null; then
-  before="$example~1"
-else
-  before="origin/main"
-fi
-
-git switch --quiet --create "$branch" origin/main
-git diff --name-only --diff-filter=AM "$before" "$example" | while IFS= read -r file; do
-  git checkout "$example" -- "$file"
+for pin in $pinned_files; do
+  [ "$(git rev-parse --quiet --verify "$example:${pin%%:*}" || true)" = "${pin#*:}" ] ||
+    die "The example download doesn't match the tested version of ${pin%%:*}. Raise your hand."
 done
-git diff --name-only --diff-filter=D "$before" "$example" | while IFS= read -r file; do
-  git rm --quiet -- "$file"
+
+git switch --quiet --no-track --create "$branch" origin/main
+for pin in $pinned_files; do
+  git checkout "$example" -- "${pin%%:*}"
 done
 git commit --quiet \
   -m "Add endpoint to get a user's profile by ID" \
@@ -56,7 +61,5 @@ git commit --quiet \
 
 say "The agent changed these files:"
 git show --stat --format= HEAD
-
-say "Sending your branch to GitHub..."
-git push --quiet --set-upstream origin "$branch"
+push_if_needed
 print_pr_link "$branch"

@@ -11,7 +11,8 @@
 # (using the same scanner versions and the same report script as the
 # workflow), the planted bugs really are exploitable (or fixed), and the
 # attendee helper scripts work in a copy that has no shared history with this
-# repository, as a "Use this template" copy doesn't.
+# repository, as a "Use this template" copy doesn't, including the ways
+# attendees go off script (fresh codespaces, failed pushes, merging early).
 #
 # Needs: git, docker, gitleaks (the version pinned in security-gates.yml), and
 # uv or python3. Semgrep runs in Docker, from the image pinned in the workflow.
@@ -51,27 +52,27 @@ else
 fi
 py="$work/venv/bin/python"
 [ -x "$py" ] && pass "python venv: $("$py" --version)" || { fail "python venv"; exit 1; }
+grep -q -- '--disable-nosem' "$workflow" && pass "workflow ignores # nosemgrep" || fail "workflow ignores # nosemgrep"
 
-# gate TOOL DIR RANGE: run one security gate the way the workflow does and
+# gate TOOL DIR [LOG_OPTS]: run one security gate the way the workflow does and
 # print "EXIT RULES" (report_findings.py exit status, sorted unique rule ids).
 gate() {
-  local tool="$1" dir="$2" range="$3" status=0 expected
+  local tool="$1" dir="$2" log_opts="${3:-HEAD}" status=0
   rm -f "$work/gl.json" "$work/gl.log" "$work/sg.json" "$work/sg.log"
   (
     cd "$dir" || exit 2
     GITHUB_STEP_SUMMARY="$work/summary-$tool-$(basename "$dir").md"
     export GITHUB_STEP_SUMMARY
     if [ "$tool" = gitleaks ]; then
-      expected="$(git rev-list --count "$range" 2>/dev/null || echo 1)"
-      gitleaks git . --config .gitleaks.toml --redact --no-banner --log-opts="$range" \
+      gitleaks git . --config .gitleaks.toml --redact --no-banner --log-opts="$log_opts" \
         --report-format json --report-path "$work/gl.json" 2>"$work/gl.log" || status=$?
       "$py" .github/scripts/report_findings.py gitleaks "$work/gl.json" "$status" \
-        --gitleaks-log "$work/gl.log" --expected-commits "$expected" >"$work/report.log" 2>&1
+        --gitleaks-log "$work/gl.log" --log-opts HEAD >"$work/report.log" 2>&1
       code=$?
       rules="$("$py" -c 'import json,sys; print(",".join(sorted({f["RuleID"] for f in json.load(open(sys.argv[1]))})))' "$work/gl.json" 2>/dev/null)"
     else
       docker run --rm --volume "$PWD:/src" --workdir /src "$semgrep_image" \
-        semgrep scan --config p/default --metrics=off --error --json --quiet \
+        semgrep scan --config p/default --metrics=off --disable-nosem --error --json --quiet \
         >"$work/sg.json" 2>"$work/sg.log" || status=$?
       "$py" .github/scripts/report_findings.py semgrep "$work/sg.json" "$status" >"$work/report.log" 2>&1
       code=$?
@@ -103,20 +104,19 @@ for branch in $branches; do
   section "Branch: $branch"
   dir="$work/$branch"
   git clone -q --branch "$branch" "$repo" "$dir" || { fail "clone $branch"; continue; }
-  git -C "$dir" fetch -q origin main:refs/remotes/origin/main 2>/dev/null
   ( cd "$dir" && "$work/venv/bin/ruff" check . >/dev/null ) && pass "lint (ruff)" || fail "lint (ruff)"
   ( cd "$dir" && "$py" -m pytest -q >"$work/pytest.log" 2>&1 ) &&
     pass "unit tests ($(tail -1 "$work/pytest.log"))" || { fail "unit tests"; tail -5 "$work/pytest.log"; }
 
-  if [ "$branch" = main ]; then range="HEAD"; else range="origin/main..HEAD"; fi
-  gl="$(gate gitleaks "$dir" "$range")"
-  sg="$(gate semgrep "$dir" -)"
+  gl="$(gate gitleaks "$dir")"
+  sg="$(gate semgrep "$dir")"
   idor="$(probe "$dir" /api/users/2/profile)"
   sqli="$(probe "$dir" "/api/users/0%20OR%20username%3D'carol'/profile")"
+  union="$(probe "$dir" "/api/users/0%20UNION%20SELECT%201,group_concat(home_address,'%20;%20'),3,4,5,6%20FROM%20users/profile")"
 
   case "$branch" in
     main)
-      expect "secret scan: clean (whole history)" "0 -" "$gl"
+      expect "secret scan (whole history): clean" "0 -" "$gl"
       expect "code scan: clean" "0 -" "$sg"
       expect "no profile endpoint yet" "404 -" "$idor"
       ;;
@@ -126,9 +126,22 @@ for branch in $branches; do
         "1 debug-enabled,formatted-sql-query,sqlalchemy-execute-raw-query" "$sg"
       expect "IDOR: Alice can read Bob's profile" "200 bob" "$idor"
       expect "SQL injection: crafted ID returns Carol" "200 carol" "$sqli"
+      expect "SQL injection: UNION returns every home address" \
+        "200 101 Maple Ave, Springfield ; 202 Oak St, Riverton ; 303 Pine Rd, Lakeview" "$union"
       expect "agent commit touches only the expected files" "app.py db.py tests/test_profile.py" \
         "$(git diff --name-only main agent-output-example | tr '\n' ' ' | sed 's/ $//')"
       grep -q "debug=True" "$dir/app.py" && pass "debug=True present" || fail "debug=True present"
+      pinned="$(grep -oE '(app\.py|db\.py|tests/test_profile\.py):[0-9a-f]{40}' scripts/use-example-change.sh | tr ':\n' '  ')"
+      actual="$(for f in app.py db.py tests/test_profile.py; do printf '%s %s ' "$f" "$(git rev-parse "agent-output-example:$f")"; done)"
+      expect "example hashes pinned in use-example-change.sh match this branch" "$actual" "$pinned"
+      # A pull request can't silence its own findings with "# nosemgrep".
+      sed -i.bak 's/debug=True)/debug=True)  # nosemgrep/' "$dir/app.py"
+      sed -i.bak 's/^\(    row = get_db().execute(query).fetchone()\)$/\1  # nosemgrep/' "$dir/db.py"
+      [ "$(cat "$dir/app.py" "$dir/db.py" | grep -c nosemgrep)" = 2 ] && pass "planted two '# nosemgrep' comments" ||
+        fail "planted two '# nosemgrep' comments"
+      expect "code scan ignores '# nosemgrep' comments" \
+        "1 debug-enabled,formatted-sql-query,sqlalchemy-execute-raw-query" "$(gate semgrep "$dir")"
+      (cd "$dir" && git checkout -q -- app.py db.py && rm -f app.py.bak db.py.bak)
       ;;
     agent-output-after-gates)
       expect "secret scan: clean" "0 -" "$gl"
@@ -147,18 +160,28 @@ done
 
 section "Trust guards (a scanner that didn't look must not pass)"
 dir="$work/agent-output-example"
-gitleaks git "$dir" --config "$dir/.gitleaks.toml" --no-banner --log-opts="0000000000000000000000000000000000000000..HEAD" \
-  --report-format json --report-path "$work/bogus.json" 2>"$work/bogus.log"
-(cd "$dir" && "$py" .github/scripts/report_findings.py gitleaks "$work/bogus.json" 0 \
-  --gitleaks-log "$work/bogus.log" --expected-commits 1 >/dev/null 2>&1)
-expect "gitleaks that scanned 0 commits is reported as not finished" 2 $?
+expect "gitleaks that scanned 0 commits is reported as not finished" "2 -" \
+  "$(gate gitleaks "$dir" "0000000000000000000000000000000000000000..HEAD")"
+expect "gitleaks that scanned only some commits is reported as not finished" "2 wsclab-session-key" \
+  "$(gate gitleaks "$dir" "HEAD~1..HEAD")"
 echo '{"results": [], "errors": [], "paths": {"scanned": []}}' >"$work/empty.json"
 (cd "$dir" && "$py" .github/scripts/report_findings.py semgrep "$work/empty.json" 0 >/dev/null 2>&1)
 expect "semgrep that scanned no files is reported as not finished" 2 $?
+git clone -q "$work/main" "$work/unicode" && (
+  cd "$work/unicode" && git config user.email t@example.com && git config user.name t &&
+    printf 'x = 1\n' >"perfil_usuário.py" && git add -A && git commit -qm unicode
+)
+expect "semgrep coverage check handles non-ASCII file names" "0 -" "$(gate semgrep "$work/unicode")"
 
 section "Attendee helper scripts, in a template-style copy (no shared history)"
 # A "Use this template" copy is one fresh commit with no history in common with
-# this repository. Build one, then play the attendee in a clone of it.
+# this repository. Build one, then play the attendee in clones of it.
+clone_copy() {  # clone_copy COPY DIR: a new "codespace" on COPY
+  rm -rf "${work:?}/$2"
+  git clone -q "$work/$1.git" "$work/$2"
+  git -C "$work/$2" config user.name "Lab Attendee"
+  git -C "$work/$2" config user.email "attendee@example.com"
+}
 make_copy() {
   local name="$1"
   git init -q --bare --initial-branch=main "$work/$name.git"
@@ -167,18 +190,23 @@ make_copy() {
       git checkout -q --orphan fresh main && git commit -q -m "Initial commit" &&
       git push -q "$work/$name.git" fresh:main
   )
-  git clone -q "$work/$name.git" "$work/$name"
-  git -C "$work/$name" config user.name "Lab Attendee"
-  git -C "$work/$name" config user.email "attendee@example.com"
+  clone_copy "$name" "$name"
 }
-run_script() {  # run_script COPY SCRIPT: run a helper script as the attendee would
+run_script() {  # run_script DIR SCRIPT: run a helper script as the attendee would
   (cd "$work/$1" && LAB_TEMPLATE_REPO="$repo" GITHUB_REPOSITORY="attendee/$1" \
     bash "scripts/$2" >"$work/script.log" 2>&1)
 }
-gates_on() {  # does the workflow on this ref trigger on pull_request?
+gates_on() {  # does the workflow at REF trigger on pull_request?
   git -C "$work/$1" show "$2:$workflow" | "$py" -c \
     'import sys,yaml; on = yaml.safe_load(sys.stdin)[True]; print("on" if "pull_request" in on else "off")'
 }
+edit_gate_line() { sed -i.bak 's/^  # pull_request:/  pull_request:/' "$work/$1/$workflow" && rm -f "$work/$1/$workflow.bak"; }
+remote_has() { git -C "$work/$1" ls-remote --exit-code --heads origin "$2" >/dev/null && echo yes || echo no; }
+refuse_pushes() {
+  printf '#!/bin/sh\necho "refused for the test" >&2\nexit 1\n' >"$work/$1.git/hooks/pre-receive"
+  chmod +x "$work/$1.git/hooks/pre-receive"
+}
+accept_pushes() { rm -f "$work/$1.git/hooks/pre-receive"; }
 
 make_copy optionb
 run_script optionb use-example-change.sh
@@ -191,37 +219,100 @@ grep -q "compare/main...agent-change" "$work/script.log" && pass "Option B: prin
   fail "Option B: prints the pull request link"
 run_script optionb use-example-change.sh
 expect "Option B: running it again just returns to the branch" 0 $?
-grep -q "already did this step" "$work/script.log" && pass "Option B: says the step is already done" ||
-  fail "Option B: says the step is already done"
 
-# A fresh codespace starts on main without the local branch: re-running must
-# recover it rather than fail on push.
-git -C "$work/optionb" switch -q main && git -C "$work/optionb" branch -q -D agent-change
-run_script optionb use-example-change.sh
-expect "Option B: in a fresh codespace, re-running recovers the branch" \
-  "0 agent-change" "$? $(git -C "$work/optionb" branch --show-current)"
+# Step 3 from a brand-new codespace, which starts on main: the gate edit must
+# land on the step 2 branch, not on a new branch with clean code.
+clone_copy optionb optionb-fresh
+edit_gate_line optionb-fresh
+run_script optionb-fresh save-my-change.sh
+expect "Step 3 in a fresh codespace: save-my-change.sh succeeds" 0 $?
+expect "Step 3 in a fresh codespace: edit lands on agent-change" agent-change \
+  "$(git -C "$work/optionb-fresh" branch --show-current)"
+expect "Step 3: gates are on at the pushed branch" on "$(gates_on optionb-fresh origin/agent-change)"
+expect "Step 3: gates are still off on main" off "$(gates_on optionb-fresh origin/main)"
+expect "Step 3: commit message" "Turn on the security gates" \
+  "$(git -C "$work/optionb-fresh" log -1 --format=%s origin/agent-change)"
+expect "Step 3: no stray my-agent-change branch" no "$(remote_has optionb-fresh my-agent-change)"
+expect "Step 3: secret scan over the attendee's branch finds the key" "1 wsclab-session-key" \
+  "$(gate gitleaks "$work/optionb-fresh")"
+run_script optionb-fresh turn-on-gates.sh
+expect "turn-on-gates.sh when the gates are already on: succeeds" 0 $?
+grep -q "already on" "$work/script.log" && pass "turn-on-gates.sh says the gates are already on" ||
+  fail "turn-on-gates.sh says the gates are already on"
+run_script optionb-fresh save-my-change.sh
+expect "save-my-change.sh with nothing new stops" 1 $?
 
-sed -i.bak 's/^  # pull_request:/  pull_request:/' "$work/optionb/$workflow" && rm -f "$work/optionb/$workflow.bak"
-run_script optionb save-my-change.sh
-expect "Step 3: save-my-change.sh pushes the edited workflow" 0 $?
-expect "Step 3: gates are on at the pushed branch" on "$(gates_on optionb origin/agent-change)"
-expect "Step 3: gates are still off on main" off "$(gates_on optionb origin/main)"
-expect "Step 3: commit message" "Turn on the security gates" "$(git -C "$work/optionb" log -1 --format=%s origin/agent-change)"
-base="$(git -C "$work/optionb" rev-parse origin/main)"
-head="$(git -C "$work/optionb" rev-parse origin/agent-change)"
-expect "Step 3: secret scan over the attendee's pull request range" "1 wsclab-session-key" \
-  "$(gate gitleaks "$work/optionb" "$base..$head")"
+section "Attendees going off script"
+# Pushes that fail (Wi-Fi, a GitHub error) must be retried by re-running, never
+# reported as done.
+make_copy flaky
+refuse_pushes flaky
+run_script flaky use-example-change.sh
+expect "Failed push in step 2: the script reports failure" 1 $?
+accept_pushes flaky
+run_script flaky use-example-change.sh
+expect "Failed push in step 2: re-running pushes the branch" "0 yes" "$? $(remote_has flaky agent-change)"
+edit_gate_line flaky
+refuse_pushes flaky
+run_script flaky save-my-change.sh
+expect "Failed push in step 3: the script reports failure" 1 $?
+accept_pushes flaky
+run_script flaky save-my-change.sh
+expect "Failed push in step 3: re-running pushes the commit" "0 on" "$? $(gates_on flaky origin/agent-change)"
 
+# Someone clicks Merge at step 2. The secret scan must still go red in step 3.
+make_copy merged
+run_script merged use-example-change.sh
+(cd "$work/merged" && git switch -q main && git merge -q --no-ff --no-edit agent-change &&
+  git push -q origin main && git switch -q agent-change)
+run_script merged turn-on-gates.sh
+expect "Merged at step 2: turn-on-gates.sh still works" 0 $?
+(cd "$work/merged" && git fetch -q origin && git switch -q --detach origin/main &&
+  git merge -q --no-edit origin/agent-change)   # what GitHub checks out for the new PR
+expect "Merged at step 2: secret scan still finds the key" "1 wsclab-session-key" "$(gate gitleaks "$work/merged")"
+
+# The agent "fixes" the key in a later commit. It is still in history.
+(cd "$work/merged" && git switch -q agent-change &&
+  git checkout -q "$(git -C "$repo" rev-parse agent-output-after-gates)" -- app.py db.py &&
+  git commit -qam "Fix what the gates found")
+expect "Key deleted in a later commit: secret scan still finds it" "1 wsclab-session-key" "$(gate gitleaks "$work/merged")"
+expect "Key deleted in a later commit: code scan is clean" "0 -" "$(gate semgrep "$work/merged")"
+
+# Option A: the agent's work, saved from main.
 make_copy optiona
 echo "# a change from my own agent" >>"$work/optiona/app.py"
 run_script optiona save-my-change.sh
-expect "Option A: save-my-change.sh from main makes a branch and pushes" 0 $?
-expect "Option A: branch name" "my-agent-change" "$(git -C "$work/optiona" branch --show-current)"
+expect "Option A: save-my-change.sh from main makes a branch and pushes" "0 yes" \
+  "$? $(remote_has optiona my-agent-change)"
 run_script optiona save-my-change.sh
-expect "Option A: nothing to save stops politely" 1 $?
-run_script optiona turn-on-gates.sh
-expect "Backup: turn-on-gates.sh succeeds" 0 $?
-expect "Backup: gates are on at the pushed branch" on "$(gates_on optiona origin/my-agent-change)"
+expect "Option A: nothing new to save stops" 1 $?
+(cd "$work/optiona/scripts" && LAB_TEMPLATE_REPO="$repo" GITHUB_REPOSITORY=attendee/optiona \
+  bash turn-on-gates.sh >"$work/script.log" 2>&1)
+expect "turn-on-gates.sh works when run from inside scripts/" 0 $?
+expect "Option A: gates are on at the pushed branch" on "$(gates_on optiona origin/my-agent-change)"
+
+# Option A where the attendee clicked Commit on main in VS Code.
+make_copy committed
+(cd "$work/committed" && echo "# committed on main" >>app.py && git commit -qam "agent work")
+run_script committed save-my-change.sh
+expect "Commit made on main: moved to my-agent-change and pushed" "0 yes" \
+  "$? $(remote_has committed my-agent-change)"
+expect "Commit made on main: local main is back to GitHub's main" "" \
+  "$(git -C "$work/committed" rev-list origin/main..main)"
+
+# The Option A agent made a mess; switch to Option B without losing anything.
+make_copy switched
+echo "# half-done agent edit" >>"$work/switched/db.py"
+run_script switched use-example-change.sh
+expect "Switching from Option A to B: succeeds" "0 yes" "$? $(remote_has switched agent-change)"
+expect "Switching from Option A to B: the agent's work was set aside, not lost" 1 \
+  "$(git -C "$work/switched" stash list | wc -l | tr -d ' ')"
+
+# An agent created a folder of tools (like a virtualenv) that isn't ignored.
+make_copy bulky
+mkdir -p "$work/bulky/tools" && for i in $(seq 1 60); do echo "x$i" >"$work/bulky/tools/f$i.py"; done
+run_script bulky save-my-change.sh
+expect "60 new files: save-my-change.sh stops before committing" "1 no" "$? $(remote_has bulky my-agent-change)"
 
 section "Result"
 if [ "$failures" -eq 0 ]; then

@@ -1,9 +1,13 @@
 __pycache__/
 *.pyc
 .venv/
+venv/
+env/
+instance/
+*.sqlite3
 .pytest_cache/
 .ruff_cache/
-directory.db
+*.db
 # security-gate reports, if you run the scanners yourself
 gitleaks.json
 semgrep.json

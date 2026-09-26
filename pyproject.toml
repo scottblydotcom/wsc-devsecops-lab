@@ -10,3 +10,8 @@ testpaths = ["tests"]
 
 [tool.ruff]
 target-version = "py312"
+
+[tool.ruff.lint]
+# "Does it build?" for this lab: syntax errors, undefined names, unused imports.
+# Style rules are left off so an AI agent's normal code style doesn't fail step 2.
+select = ["E4", "E7", "E9", "F"]

@@ -9,3 +9,4 @@ DevSecOps training lab.
 - Start the app with `python app.py`. It serves on http://127.0.0.1:5000
 - Keep changes small and follow the existing style.
 - Add tests for any new endpoint.
+- Before you finish, run `ruff check --fix .` and `python -m pytest`. Both must pass.

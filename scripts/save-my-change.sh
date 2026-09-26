@@ -4,36 +4,58 @@
 #   LAB STEP 3: after you turn on the security gates.
 # Changes never go straight to main; they go on a branch, for a pull request.
 set -euo pipefail
+here="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=scripts/lib.sh
-source "$(dirname "$0")/lib.sh"
+source "$here/lib.sh"
 cd "$(git rev-parse --show-toplevel)"
-
-[ -n "$(git status --porcelain)" ] ||
-  die "Nothing to save: no files have changed. Did your agent finish? Is the file saved?"
-
-branch="$(git branch --show-current)"
-if [ "$branch" = "main" ] || [ -z "$branch" ]; then
-  branch="my-agent-change"
-  git fetch --quiet origin
-  if git show-ref --verify --quiet "refs/heads/$branch" ||
-     git show-ref --verify --quiet "refs/remotes/origin/$branch"; then
-    die "You already have a '$branch' branch. Ask a facilitator for help."
-  fi
-  git switch --quiet --create "$branch"
-fi
+git fetch --quiet origin
 
 changes="$(git status --porcelain)"
-if grep -q 'security-gates.yml' <<<"$changes"; then
-  message="Turn on the security gates"
-else
-  message="Add endpoint to get a user's profile by ID (written by my AI agent)"
+branch="$(git branch --show-current)"
+
+if [ "$branch" = "main" ] || [ -z "$branch" ]; then
+  if grep -q 'security-gates.yml' <<<"$changes"; then
+    # Step 3 in a fresh codespace: the gates belong on your step 2 branch.
+    pr_branch="$(existing_pr_branch)" ||
+      die "You have more than one lab branch. Raise your hand."
+    [ -n "$pr_branch" ] ||
+      die "Do LAB step 2 first, so you have a pull request for the gates to check."
+    git switch --quiet "$pr_branch" ||
+      die "Could not switch to your '$pr_branch' branch. Raise your hand."
+    branch="$pr_branch"
+    say "Switched to your '$branch' branch, where your pull request is."
+  elif [ -n "$changes" ] || [ -n "$(git rev-list origin/main..HEAD)" ]; then
+    # Step 2, option A: your agent's work goes on its own branch.
+    branch="my-agent-change"
+    branch_exists "$branch" &&
+      die "You already saved an agent change. Run: git switch $branch   then run this again."
+    git switch --quiet --create "$branch"
+    # If anything was committed on main by mistake, it moved to the branch; reset main.
+    git branch --quiet --force main origin/main
+  fi
 fi
 
-git add --all
-git commit --quiet -m "$message"
-say "Saved on branch '$branch':"
-git show --stat --format='  %s' HEAD
+if [ -n "$changes" ]; then
+  if grep -q 'security-gates.yml' <<<"$changes"; then
+    message="Turn on the security gates"
+  else
+    message="Add endpoint to get a user's profile by ID (written by my AI agent)"
+  fi
+  git add --all
+  count="$(git diff --cached --name-only | wc -l | tr -d ' ')"
+  if [ "$count" -gt 50 ]; then
+    git reset --quiet
+    die "That's $count files, which is too many. Your agent probably created a folder of tools (like venv/). Raise your hand."
+  fi
+  git commit --quiet -m "$message"
+  say "Saved on branch '$branch':"
+  git show --stat --format='  %s' HEAD
+elif [ "$branch" = "main" ] || {
+       git show-ref --verify --quiet "refs/remotes/origin/$branch" &&
+       [ -z "$(git rev-list "origin/$branch..HEAD")" ]
+     }; then
+  die "Nothing new to save: no files changed since your last save. (Turning on the gates? Make the one-line edit first, or run: bash scripts/turn-on-gates.sh)"
+fi
 
-say "Sending your branch to GitHub..."
-git push --quiet --set-upstream origin "$branch"
+push_if_needed
 print_pr_link "$branch"

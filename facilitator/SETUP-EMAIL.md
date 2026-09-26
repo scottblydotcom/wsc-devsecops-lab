@@ -1,8 +1,9 @@
 # Setup email (for WSC to send attendees)
 
-Send by **Tue Sep 29**. Facts below were checked against GitHub, Anthropic,
-OpenAI and Google documentation on 2026-09-25. Re-check the AI tool lines if
-the email goes out much later: free tiers changed several times in 2026.
+Send by **Tue Sep 29**, after the fresh-account dry run passes. Facts below were
+checked against GitHub, Anthropic, OpenAI and Google documentation on 2026-09-25.
+Re-check the AI tool lines if the email goes out much later: free tiers changed
+several times in 2026.
 
 ---
 
@@ -18,20 +19,22 @@ anything or know how to code.**
 
 Please do these three things before Saturday. They take about 10 minutes.
 
-**1. Get a free GitHub account, and verify your email.**
-Sign up at <https://github.com/signup> (skip this if you already have an
-account). GitHub then emails you a verification link. **Click it.** Without a
-verified email, GitHub won't let you do the lab's first step. Please use a real
-email address; disposable ones can't be verified.
+**1. Get a free GitHub account with a verified email.**
+- New to GitHub: sign up at <https://github.com/signup>. GitHub emails you a
+  code; type it on the sign-up page. Please use a real email address; disposable
+  ones can't be verified.
+- Already have an account: check that <https://github.com/settings/emails> shows
+  your address as **Verified**.
+
+Without a verified email, GitHub won't let you do the lab's first step.
 
 **2. Make your copy of the lab, and check it opens.**
 While signed in to GitHub, open this link:
-<https://github.com/new?template_owner=scottblydotcom&template_name=wsc-devsecops-lab&owner=@me&name=wsc-devsecops-lab&visibility=public>
+<https://github.com/new?template_owner=scottblydotcom&template_name=wsc-devsecops-lab&name=wsc-devsecops-lab&visibility=public>
 - Click **Create repository**.
 - On the page that opens, click the green **Code** button → **Codespaces** tab →
   **Create codespace on main**.
-- An editor opens in your browser. Wait until the panel at the bottom says
-  `Lab ready`. That means it works.
+- After about 2 minutes, a code editor opens in your browser. That means it works.
 - Then clean up: go to <https://github.com/codespaces>, click **⋯** next to it,
   and choose **Delete**. Your copy of the lab stays; you'll open a fresh
   codespace on Saturday.
@@ -48,15 +51,15 @@ sort it out before Saturday.
 You'll get the most out of the lab with an AI agent, but you don't need one.
 The lab includes a recorded example, and you can pair up with a neighbor.
 
-- **Free and works in the lab: GitHub Copilot Free.** Turn it on at
+- **Free option: GitHub Copilot Free.** Turn it on at
   <https://github.com/settings/copilot> ("Start using Copilot Free"). It
   includes agent mode, with a limited monthly allowance that resets on the 1st.
   If your GitHub account already has Copilot through an employer, you'll use
   that instead, under your employer's rules.
-- **Claude Code** needs a paid Claude plan (Pro or higher). Bring it if you
-  already have one.
-- **OpenAI Codex**: ChatGPT's free plan covers only the Codex desktop app, which
-  won't work inside the lab environment. Paid ChatGPT plans (Plus and up) work.
+- **Claude Code** (paid Claude plan) or **OpenAI Codex** (ChatGPT Plus or higher):
+  if you already use one, you can try it in the lab. We haven't tested them inside
+  the lab environment, and the recorded example is the backup. ChatGPT's free plan
+  covers only the Codex desktop app, which won't work in the lab.
 - **Gemini Code Assist's free tier ended in June 2026.** Older tutorials that
   call it free are out of date.
 
@@ -73,14 +76,19 @@ Scott Bly
 
 - Step 2 has attendees create their copy early. That surfaces account problems
   before the day, but a copy doesn't pick up later changes to the template.
-  **Freeze `main` once this is sent.** If a fix is unavoidable, tell attendees to
-  make a second copy with the same link, named `wsc-devsecops-lab-2`.
+  **Freeze `main` and the three example branches once this is sent.** If a fix is
+  unavoidable, tell attendees to make a second copy with the same link, named
+  `wsc-devsecops-lab-2`.
+- If the dry run confirms Copilot Free agent mode inside a Codespace, you can
+  strengthen "Free option" to "Free, and tested in the lab environment".
 - Claims and sources:
   - Codespaces: 120 core-hours/month on GitHub Free = 60 h on 2-core; resets on
     the 1st; with no payment method, usage is blocked at the quota. Source: GitHub
     Docs, "About billing for GitHub Codespaces".
   - Verified email needed to create repos, PRs and use Actions. Source: GitHub Docs,
-    "Email addresses reference".
+    "Email addresses reference". New sign-ups verify with an emailed launch code.
+  - Actions: free for public repositories on standard runners; 2,000 minutes/month
+    for private repos on GitHub Free. Source: GitHub Docs, "GitHub Actions billing".
   - Copilot Free includes agent mode; the allowance isn't published as a number.
     Source: GitHub Docs, "Plans for GitHub Copilot". Copilot works in Codespaces
     per GitHub Docs; **Free-in-Codespaces is not yet tested end to end** (dry run item).
