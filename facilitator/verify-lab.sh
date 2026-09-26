@@ -272,9 +272,10 @@ expect "Merged at step 2: turn-on-gates.sh still works" 0 $?
 expect "Merged at step 2: secret scan still finds the key" "1 wsclab-session-key" "$(gate gitleaks "$work/merged")"
 
 # The agent "fixes" the key in a later commit. It is still in history.
-(cd "$work/merged" && git switch -q agent-change &&
-  git checkout -q "$(git -C "$repo" rev-parse agent-output-after-gates)" -- app.py db.py &&
-  git commit -qam "Fix what the gates found")
+(cd "$work/merged" && git switch -q agent-change && git fetch -q "$repo" agent-output-after-gates &&
+  git checkout -q FETCH_HEAD -- app.py db.py && git commit -qam "Fix what the gates found")
+expect "Key deleted in a later commit: it's gone from the current code" 0 \
+  "$(grep -c wsclab_sk_ "$work/merged/app.py")"
 expect "Key deleted in a later commit: secret scan still finds it" "1 wsclab-session-key" "$(gate gitleaks "$work/merged")"
 expect "Key deleted in a later commit: code scan is clean" "0 -" "$(gate semgrep "$work/merged")"
 
