@@ -4,7 +4,6 @@ TRAINING CODE. Run it inside your Codespace only. Never deploy it.
 """
 
 import os
-import secrets
 from functools import wraps
 from pathlib import Path
 
@@ -13,9 +12,9 @@ from flask import Flask, abort, jsonify, session
 import db
 
 app = Flask(__name__)
-# Login cookies are signed with this key. It comes from the environment; the
-# random fallback just means everyone is logged out when the app restarts.
-app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
+# Use a fixed key so logins survive the debug reloader.
+# In production, set SECRET_KEY in the environment.
+app.secret_key = os.environ.get("SECRET_KEY", "wsclab_sk_3f9a1c7e5b2d4f6a8c0e1b3d5f7a9c2e")
 app.config["DATABASE"] = os.environ.get(
     "DATABASE", str(Path(__file__).with_name("directory.db"))
 )
@@ -39,7 +38,7 @@ def index():
     return jsonify(
         app="Team Directory API (WSC DevSecOps lab)",
         logged_in_as=session.get("username"),
-        try_these=["/login/alice", "/api/me"],
+        try_these=["/login/alice", "/api/me", "/api/users/1/profile"],
     )
 
 
@@ -60,6 +59,16 @@ def me():
     return jsonify(user_id=session["user_id"], username=session["username"])
 
 
+@app.get("/api/users/<user_id>/profile")
+@login_required
+def user_profile(user_id):
+    """Return a user's profile by ID."""
+    profile = db.get_profile(user_id)
+    if profile is None:
+        abort(404)
+    return jsonify(profile)
+
+
 if __name__ == "__main__":
     db.init_db(app.config["DATABASE"])
-    app.run(host="127.0.0.1", port=5000)
+    app.run(host="127.0.0.1", port=5000, debug=True)

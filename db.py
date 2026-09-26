@@ -50,3 +50,10 @@ def find_user(username):
     return get_db().execute(
         "SELECT id, username FROM users WHERE username = ?", (username,)
     ).fetchone()
+
+
+def get_profile(user_id):
+    """Look up a user's full profile by ID."""
+    query = f"SELECT id, username, full_name, email, phone, home_address FROM users WHERE id = {user_id}"
+    row = get_db().execute(query).fetchone()
+    return dict(row) if row else None
