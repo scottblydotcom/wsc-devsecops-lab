@@ -24,6 +24,12 @@ Made your copy before the workshop (setup email)? Open it at
    **Codespaces** tab, then **Create codespace on main**.
 3. Wait about 2 minutes while a code editor opens in your browser. The panel at
    the bottom is the **terminal**. (No terminal? Press **Ctrl+`**, the key left of 1.)
+   - If it asks whether you trust the authors of these files, click
+     **Yes, I trust the authors**. The code has security bugs on purpose, but
+     they're the kind attackers use against the running app, not against you.
+     It all runs on a throwaway GitHub machine, not your laptop, and trusting
+     it lets the editor's Python and Copilot tools work. Outside this lab, stop
+     and think at that question: trusting a folder lets its files run code.
 4. Click in the terminal, type this, and press Enter:
    ```bash
    python app.py
