@@ -51,10 +51,26 @@ Your team asked for this:
 **Option A: you have an AI agent (for example GitHub Copilot).** Open its chat
 (Copilot: **Ctrl+Alt+I**, or **Ctrl+Cmd+I** on a Mac), switch it to
 **Agent** mode, paste the request above, and click **Keep** on the changes it
-makes. Then run this in the terminal:
+makes. (Copilot Free is enough: no trial or card needed.) Then run this in the
+terminal:
 ```bash
 bash scripts/save-my-change.sh
 ```
+
+*Option A with Claude Code.* This is only for people who already pay for Claude
+or have Claude API credits: Claude Code has no free version. Everyone else, use
+Copilot Free or Option B.
+1. Install it in the terminal:
+   ```bash
+   curl -fsSL https://claude.ai/install.sh | bash
+   ```
+   This is Anthropic's own installer. Piping a download straight into `bash`
+   runs it unread: fine on this throwaway machine, but on your own computer,
+   read the script first.
+2. Type `claude` and press Enter. Log in when it shows a link.
+3. Paste the request above, then add: *Don't commit or push. I'll do that.*
+   (The lab's script puts your change on its own branch for a pull request.)
+4. When it's done, type `/exit`, then run `bash scripts/save-my-change.sh`.
 
 **Option B: everyone else, or if you'd rather follow along exactly.** This
 applies a recorded example of what an AI agent might write for this request:
