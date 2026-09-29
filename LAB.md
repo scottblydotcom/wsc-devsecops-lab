@@ -97,6 +97,12 @@ nothing at all. Compare with a neighbor who used Option B.
 
 ## Step 4 · What did the gates miss? (8 min)
 
+(Option A: your agent may have picked a different address for the profile page.
+Before you start the app, run `grep -n "@app" app.py` in the terminal. Your
+agent's address is the one that isn't `/`, `/login/...` or `/api/me`, for
+example `/api/users/<int:user_id>`. In items 3 and 4, use that address, with
+the `1` or `2` in place of the part in `< >`.)
+
 1. In the terminal, start the app again. This time it's the agent's version:
    ```bash
    python app.py
@@ -108,9 +114,6 @@ nothing at all. Compare with a neighbor who used Option B.
 4. Change the `1` to a `2`.
 
 🤔 **Whose home address is that? Which check caught it? Who *should* have caught it?**
-
-(Option A: your agent may have picked a different address for the profile page.
-Look in `app.py` for the route it added.)
 
 ## Step 5 · Wrap up (2 min)
 
