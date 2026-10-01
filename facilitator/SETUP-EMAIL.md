@@ -1,6 +1,6 @@
 # Setup email (for WSC to send attendees)
 
-Send by **Tue Sep 29**, after the fresh-account dry run passes. Facts below were
+Send as soon as the fresh-account dry run passes (the workshop is Sat Oct 3). Facts below were
 checked against GitHub, Anthropic, OpenAI and Google documentation on 2026-09-25.
 Re-check the AI tool lines if the email goes out much later: free tiers changed
 several times in 2026.
@@ -35,6 +35,9 @@ While signed in to GitHub, open this link:
 - On the page that opens, click the green **Code** button → **Codespaces** tab →
   **Create codespace on main**.
 - After about 2 minutes, a code editor opens in your browser. That means it works.
+- If it asks whether you trust the authors of the files, click **Yes, I trust
+  the authors**. The lab code has security bugs on purpose, but it runs on a
+  throwaway GitHub machine, not your laptop. The lab guide explains why it's safe.
 - Then clean up: go to <https://github.com/codespaces>, click **⋯** next to it,
   and choose **Delete**. Your copy of the lab stays; you'll open a fresh
   codespace on Saturday.
@@ -56,10 +59,12 @@ The lab includes a recorded example, and you can pair up with a neighbor.
   includes agent mode, with a limited monthly allowance that resets on the 1st.
   If your GitHub account already has Copilot through an employer, you'll use
   that instead, under your employer's rules.
-- **Claude Code** (paid Claude plan) or **OpenAI Codex** (ChatGPT Plus or higher):
-  if you already use one, you can try it in the lab. We haven't tested them inside
-  the lab environment, and the recorded example is the backup. ChatGPT's free plan
-  covers only the Codex desktop app, which won't work in the lab.
+- **Claude Code**, if you already pay for Claude (a Pro, Max, Team or Enterprise
+  plan, or API credits): the lab guide has steps to set it up. It has no free
+  version, so there's no need to sign up for it. If it gives you trouble, the
+  recorded example is the backup.
+- **OpenAI Codex** isn't set up for the lab environment yet. If it's your tool,
+  use the recorded example or pair up with a neighbor.
 - **Gemini Code Assist's free tier ended in June 2026.** Older tutorials that
   call it free are out of date.
 
@@ -93,9 +98,11 @@ Scott Bly
     Source: GitHub Docs, "Plans for GitHub Copilot". Copilot works in Codespaces
     per GitHub Docs; **Free-in-Codespaces is not yet tested end to end** (dry run item).
   - Claude Code: "requires a Pro, Max, Team, Enterprise, or Console account".
-    Source: Claude Code setup docs.
-  - Codex on ChatGPT Free: desktop app only; CLI and IDE extension start at Plus.
-    Source: OpenAI Codex pricing docs. Free access was announced as "for a limited
-    time" in Feb 2026.
+    Source: Claude Code setup docs. LAB.md step 2 has its Codespace steps (native
+    installer); added 2026-09-29 at a dry-run tester's request, being tested in
+    that tester's run.
+  - Codex: the dry-run tester reported `npm install -g` failing in the Codespace
+    (the image appears to have no Node.js; not independently checked), and no
+    other install route has been tested. Hence "not set up yet".
   - Gemini Code Assist for individuals stopped serving June 18, 2026. Source: Google
     deprecation notice.
